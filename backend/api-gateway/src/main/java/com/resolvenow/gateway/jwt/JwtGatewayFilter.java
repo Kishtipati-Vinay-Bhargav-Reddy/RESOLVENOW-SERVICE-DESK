@@ -2,10 +2,13 @@ package com.resolvenow.gateway.jwt;
 
 import java.io.IOException;
 import java.util.Base64;
+import java.util.Collections;
 
 import javax.crypto.SecretKey;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -52,16 +55,36 @@ public class JwtGatewayFilter extends OncePerRequestFilter {
         String token = authHeader.substring(7).trim();
 
         try {
+
+            // Validate and parse JWT
             Claims claims = Jwts.parser()
                     .verifyWith(getSigningKey())
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
 
-            // JWT is valid
+            // Get username from JWT subject
+            String username = claims.getSubject();
+
+            // Create authenticated user
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(
+                            username,
+                            null,
+                            Collections.emptyList()
+                    );
+
+            // Store authentication in Spring Security context
+            SecurityContextHolder.getContext()
+                    .setAuthentication(authentication);
+
+            // Continue request
             filterChain.doFilter(request, response);
 
         } catch (Exception e) {
+
+            SecurityContextHolder.clearContext();
+
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.getWriter().write("Invalid or expired JWT token");
         }
