@@ -23,6 +23,7 @@ function Login({ onLogin, initialMode = "login" }) {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState("USER");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(() => location.state?.message || "");
@@ -71,7 +72,8 @@ function Login({ onLogin, initialMode = "login" }) {
         await api.post("/auth/register", { 
           username: username.trim(), 
           email: email.trim(), 
-          password 
+          password,
+          role 
         });
         navigate("/login", { 
           state: { message: "Account created successfully! Sign in to enter your workspace." }, 
@@ -256,6 +258,35 @@ function Login({ onLogin, initialMode = "login" }) {
               </div>
             )}
 
+            {!isLogin && (
+              <div className="form-group">
+                <label>Account Role & Permissions</label>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "4px" }}>
+                  <button
+                    type="button"
+                    className={`btn ${role === "USER" ? "btn-primary" : "btn-secondary"}`}
+                    onClick={() => setRole("USER")}
+                    style={{ padding: "10px 12px", fontSize: "0.85rem", justifyContent: "center" }}
+                  >
+                    👤 Employee (USER)
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn ${role === "STAFF" ? "btn-primary" : "btn-secondary"}`}
+                    onClick={() => setRole("STAFF")}
+                    style={{ padding: "10px 12px", fontSize: "0.85rem", justifyContent: "center" }}
+                  >
+                    🛠️ Support Staff (STAFF)
+                  </button>
+                </div>
+                <small style={{ color: "var(--text-muted)", fontSize: "0.76rem", marginTop: "4px", display: "block" }}>
+                  {role === "USER"
+                    ? "Allows lodging grievances, tracking issue status, and viewing SLA progress."
+                    : "Allows handling departmental ticket queues, reassigning, and updating statuses."}
+                </small>
+              </div>
+            )}
+
             <div className="form-group">
               <label htmlFor="auth-password">Password</label>
               <div style={{ position: "relative" }}>
@@ -265,7 +296,8 @@ function Login({ onLogin, initialMode = "login" }) {
                   style={{ paddingLeft: "38px", paddingRight: "38px" }}
                   type={showPassword ? "text" : "password"}
                   autoComplete={isLogin ? "current-password" : "new-password"}
-                  placeholder="Enter password"
+                  placeholder={isLogin ? "Enter password" : "At least 8 characters"}
+                  minLength={isLogin ? undefined : 8}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -280,6 +312,11 @@ function Login({ onLogin, initialMode = "login" }) {
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+              {!isLogin && (
+                <small style={{ color: "var(--text-muted)", fontSize: "0.76rem", marginTop: "4px", display: "block" }}>
+                  Security rule: Minimum 8 characters required.
+                </small>
+              )}
             </div>
 
             <button

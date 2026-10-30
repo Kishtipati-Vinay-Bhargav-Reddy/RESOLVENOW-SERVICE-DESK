@@ -37,11 +37,16 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
         }
 
+        String assignedRole = "USER";
+        if (request.role() != null && "STAFF".equalsIgnoreCase(request.role().trim())) {
+            assignedRole = "STAFF";
+        }
+
         User user = new User(
                 request.username(),
                 request.email(),
                 passwordEncoder.encode(request.password()),
-                "USER"
+                assignedRole
         );
         return toUserResponse(userRepository.save(user));
     }
