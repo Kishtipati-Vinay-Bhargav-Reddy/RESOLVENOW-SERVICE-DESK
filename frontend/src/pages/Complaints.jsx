@@ -1,18 +1,51 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { 
+  Plus, 
+  Search, 
+  RotateCw, 
+  X, 
+  Laptop, 
+  Users, 
+  DollarSign, 
+  Activity, 
+  Clock, 
+  AlertTriangle, 
+  Flame, 
+  ArrowRight
+} from "lucide-react";
 import AppShell from "../components/AppShell";
 import ComplaintList from "../components/ComplaintList";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader } from "../components/Feedback";
-import Icon from "../components/Icon";
 import { useToast } from "../components/ToastContext";
 import { createComplaint, getCollection, getComplaints, getErrorMessage } from "../services/api";
 
-const departments = ["IT", "HR", "FINANCE", "OPERATIONS"];
-const priorities = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
-const statusFilters = [["", "All status"], ["OPEN", "Open"], ["ASSIGNED", "Assigned"], ["IN_PROGRESS", "In progress"], ["RESOLVED", "Resolved"], ["CLOSED", "Closed"]];
+const departments = [
+  { id: "IT", name: "Information Technology", icon: Laptop, desc: "Hardware, Network, Cloud & Access" },
+  { id: "HR", name: "Human Resources", icon: Users, desc: "Payroll, Benefits & Policy" },
+  { id: "FINANCE", name: "Finance & Accounts", icon: DollarSign, desc: "Billing, Expenses & Approvals" },
+  { id: "OPERATIONS", name: "Operations", icon: Activity, desc: "Facilities, Logistics & Workflow" },
+];
+
+const priorities = [
+  { id: "LOW", label: "Low", sla: "72h SLA", icon: Clock, color: "var(--accent-emerald)" },
+  { id: "MEDIUM", label: "Medium", sla: "48h SLA", icon: Clock, color: "var(--accent-blue)" },
+  { id: "HIGH", label: "High", sla: "24h SLA", icon: AlertTriangle, color: "var(--accent-amber)" },
+  { id: "CRITICAL", label: "Critical", sla: "4h SLA", icon: Flame, color: "var(--accent-rose)" },
+];
+
+const statusFilters = [
+  { id: "", label: "All Statuses" },
+  { id: "OPEN", label: "Open" },
+  { id: "ASSIGNED", label: "Assigned" },
+  { id: "IN_PROGRESS", label: "In Progress" },
+  { id: "RESOLVED", label: "Resolved" },
+  { id: "CLOSED", label: "Closed" },
+];
+
 const defaultForm = { title: "", department: "IT", description: "", priority: "MEDIUM" };
-const idOf = (complaint) => complaint.id ?? complaint.complaintId;
-const statusOf = (complaint) => String(complaint.status || "OPEN").toUpperCase();
+const idOf = (c) => c.id ?? c.complaintId;
+const statusOf = (c) => String(c.status || "OPEN").toUpperCase();
 
 function Complaints({ username, user, onLogout }) {
   const showToast = useToast();
@@ -22,10 +55,12 @@ function Complaints({ username, user, onLogout }) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+
   const [form, setForm] = useState(defaultForm);
-  const [formOpen, setFormOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
+
   const query = searchParams.get("q") || "";
   const statusFilter = searchParams.get("status") || "";
   const departmentFilter = searchParams.get("department") || "";
@@ -34,8 +69,12 @@ function Complaints({ username, user, onLogout }) {
   useEffect(() => {
     let active = true;
     getComplaints()
-      .then((response) => { if (active) setComplaints(getCollection(response)); })
-      .catch((requestError) => { if (active) setError(getErrorMessage(requestError)); })
+      .then((response) => { 
+        if (active) setComplaints(getCollection(response)); 
+      })
+      .catch((requestError) => { 
+        if (active) setError(getErrorMessage(requestError)); 
+      })
       .finally(() => {
         if (active) {
           setIsLoading(false);
@@ -56,28 +95,25 @@ function Complaints({ username, user, onLogout }) {
     setIsLoading(true);
     setRefreshing(true);
     setError("");
-    setRefreshKey((value) => value + 1);
-  };
-
-  const updateForm = (event) => {
-    setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
-    setFormError("");
+    setRefreshKey((v) => v + 1);
   };
 
   const submitComplaint = async (event) => {
     event.preventDefault();
     setIsSubmitting(true);
     setFormError("");
+
     try {
       await createComplaint({
-        ...form,
         title: form.title.trim(),
+        department: form.department,
         description: form.description.trim(),
         priority: form.priority,
       });
+
       setForm(defaultForm);
-      setFormOpen(false);
-      showToast("Complaint created and submitted.");
+      setModalOpen(false);
+      showToast("Grievance submitted & auto-assigned successfully!");
       window.dispatchEvent(new Event("notifications:changed"));
       refresh();
     } catch (requestError) {
@@ -89,79 +125,286 @@ function Complaints({ username, user, onLogout }) {
 
   const normalizedQuery = query.trim().toLowerCase();
   const filteredComplaints = complaints.filter((complaint) => {
-    const searchable = [idOf(complaint), complaint.title, complaint.description, complaint.department, complaint.priority]
-      .filter(Boolean).join(" ").toLowerCase();
-    return (!normalizedQuery || searchable.includes(normalizedQuery))
-      && (!statusFilter || statusOf(complaint) === statusFilter)
-      && (!departmentFilter || complaint.department === departmentFilter);
+    const searchable = [
+      idOf(complaint), 
+      complaint.title, 
+      complaint.description, 
+      complaint.department, 
+      complaint.priority,
+      complaint.username
+    ].filter(Boolean).join(" ").toLowerCase();
+
+    return (
+      (!normalizedQuery || searchable.includes(normalizedQuery)) &&
+      (!statusFilter || statusOf(complaint) === statusFilter) &&
+      (!departmentFilter || complaint.department === departmentFilter)
+    );
   });
-  filteredComplaints.sort((left, right) => {
-    if (sort === "oldest") return new Date(left.createdAt) - new Date(right.createdAt);
-    if (sort === "newest") return new Date(right.createdAt) - new Date(left.createdAt);
-    if (sort === "status") return statusOf(left).localeCompare(statusOf(right));
-    return new Date(right.updatedAt || right.createdAt) - new Date(left.updatedAt || left.createdAt);
+
+  filteredComplaints.sort((a, b) => {
+    if (sort === "oldest") return new Date(a.createdAt) - new Date(b.createdAt);
+    if (sort === "newest") return new Date(b.createdAt) - new Date(a.createdAt);
+    if (sort === "status") return statusOf(a).localeCompare(statusOf(b));
+    return new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt);
   });
 
   const clearFilters = () => setSearchParams(new URLSearchParams(), { replace: true });
 
-  return <AppShell activeItem="Complaints" username={username} role={user?.role} onLogout={onLogout}>
-    <PageHeader eyebrow="SERVICE DESK / WORK QUEUE" title="Complaints"
-      description="Manage reported issues and track each one through resolution."
-      actions={<>
-        <button className="button button-secondary" type="button" onClick={refresh} disabled={refreshing}><Icon name="refresh" size={17} />{refreshing ? "Refreshing" : "Refresh"}</button>
-        <button className="button button-primary" type="button" onClick={() => setFormOpen((open) => !open)} aria-expanded={formOpen}>
-          <Icon name={formOpen ? "close" : "plus"} size={18} />{formOpen ? "Close form" : "New complaint"}
-        </button>
-      </>} />
+  return (
+    <AppShell activeItem="Complaints" username={username} role={user?.role} onLogout={onLogout}>
+      <PageHeader
+        eyebrow="SERVICE REGISTER / INCIDENT MANAGEMENT"
+        title="Service Grievances & Tickets"
+        description="Submit, monitor, and resolve cross-department grievances with real-time SLA tracking."
+        actions={
+          <div style={{ display: "flex", gap: "10px" }}>
+            <button className="btn btn-secondary" type="button" onClick={refresh} disabled={refreshing}>
+              <RotateCw size={15} className={refreshing ? "spin-slow" : ""} />
+              <span>{refreshing ? "Updating..." : "Refresh"}</span>
+            </button>
+            <button className="btn btn-primary" type="button" onClick={() => setModalOpen(true)}>
+              <Plus size={16} />
+              <span>Raise Grievance</span>
+            </button>
+          </div>
+        }
+      />
 
-    {error && <ErrorState title="Unable to load complaints." detail={error} onRetry={refresh} />}
+      {error && <ErrorState title="Error fetching grievances" detail={error} onRetry={refresh} />}
 
-    {formOpen && <section className="surface complaint-composer" aria-labelledby="new-complaint-title">
-      <div className="section-heading"><div><p className="eyebrow">NEW REQUEST</p><h2 id="new-complaint-title">Complaint details</h2></div></div>
-      <form className="complaint-form" onSubmit={submitComplaint}>
-        <label>Title<input name="title" value={form.title} onChange={updateForm} placeholder="Briefly describe the issue" maxLength={120} required /></label>
-        <label>Department<select name="department" value={form.department} onChange={updateForm} required>
-          {departments.map((department) => <option key={department} value={department}>{department[0] + department.slice(1).toLowerCase()}</option>)}
-        </select></label>
-        <label>Priority<select name="priority" value={form.priority} onChange={updateForm}>
-          {priorities.map((priority) => <option key={priority} value={priority}>{priority[0] + priority.slice(1).toLowerCase()}</option>)}
-        </select></label>
-        <label className="field-wide">Description<textarea name="description" value={form.description} onChange={updateForm}
-          placeholder="Include the impact, timing, and relevant context" maxLength={2000} rows={5} required /></label>
-        {formError && <p className="field-wide form-error" role="alert">{formError}</p>}
-        <div className="form-footer field-wide"><span>Your account identity and SLA target are attached automatically.</span>
-          <button className="button button-primary" type="submit" disabled={isSubmitting}>{isSubmitting ? "Submitting..." : "Submit complaint"}</button>
+      {/* Filter and Search Bar */}
+      <div 
+        style={{ 
+          background: "var(--bg-surface)", 
+          border: "1px solid var(--border-subtle)", 
+          borderRadius: "var(--radius-lg)", 
+          padding: "16px 20px",
+          marginBottom: "24px",
+          display: "flex",
+          gap: "16px",
+          alignItems: "center",
+          flexWrap: "wrap",
+          justifyContent: "space-between"
+        }}
+      >
+        <div style={{ display: "flex", gap: "12px", alignItems: "center", flex: 1, minWidth: "280px" }}>
+          <div style={{ position: "relative", width: "100%", maxWidth: "360px" }}>
+            <input
+              className="form-control"
+              style={{ paddingLeft: "36px", height: "38px" }}
+              placeholder="Filter by ID, summary, keywords..."
+              value={query}
+              onChange={(e) => setFilter("q", e.target.value)}
+            />
+            <Search size={16} style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
+          </div>
+
+          <select
+            className="form-control"
+            style={{ width: "auto", height: "38px", cursor: "pointer" }}
+            value={departmentFilter}
+            onChange={(e) => setFilter("department", e.target.value)}
+          >
+            <option value="">All Departments</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>{d.id} ({d.name})</option>
+            ))}
+          </select>
+
+          <select
+            className="form-control"
+            style={{ width: "auto", height: "38px", cursor: "pointer" }}
+            value={sort}
+            onChange={(e) => setFilter("sort", e.target.value)}
+          >
+            <option value="updated">Recently Updated</option>
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
+            <option value="status">By Status</option>
+          </select>
         </div>
-      </form>
-    </section>}
 
-    <section className="surface complaint-register" aria-labelledby="complaint-register-title">
-      <div className="section-heading register-heading">
-        <div><p className="eyebrow">ISSUE REGISTER</p><h2 id="complaint-register-title">All complaints</h2></div>
-        <span className="section-count">{filteredComplaints.length} of {complaints.length}</span>
-      </div>
-      <div className="filter-toolbar">
-        <label className="search-control"><Icon name="search" size={18} /><input aria-label="Search complaints" placeholder="Search ID, title, details" value={query}
-          onChange={(event) => setFilter("q", event.target.value)} /></label>
-        <label className="filter-control"><span className="visually-hidden">Filter by status</span><select value={statusFilter} onChange={(event) => setFilter("status", event.target.value)}>
-          {statusFilters.map(([value, label]) => <option key={label} value={value}>{label}</option>)}
-        </select></label>
-        <label className="filter-control"><span className="visually-hidden">Filter by department</span><select value={departmentFilter} onChange={(event) => setFilter("department", event.target.value)}>
-          <option value="">All departments</option>{departments.map((department) => <option key={department} value={department}>{department[0] + department.slice(1).toLowerCase()}</option>)}
-        </select></label>
-        <label className="filter-control"><span className="visually-hidden">Sort complaints</span><select value={sort} onChange={(event) => setFilter("sort", event.target.value)}>
-          <option value="updated">Recently updated</option><option value="newest">Newest</option><option value="oldest">Oldest</option><option value="status">Status</option>
-        </select></label>
+        {/* Status Filter Chips */}
+        <div style={{ display: "flex", gap: "6px", overflowX: "auto", paddingBottom: "2px" }}>
+          {statusFilters.map((sf) => (
+            <button
+              key={sf.id}
+              type="button"
+              className={`badge ${statusFilter === sf.id ? "status-open" : ""}`}
+              style={{
+                cursor: "pointer",
+                padding: "6px 12px",
+                background: statusFilter === sf.id ? "rgba(59, 130, 246, 0.2)" : "var(--bg-app)",
+                border: statusFilter === sf.id ? "1px solid var(--accent-blue)" : "1px solid var(--border-subtle)",
+                color: statusFilter === sf.id ? "#60A5FA" : "var(--text-secondary)"
+              }}
+              onClick={() => setFilter("status", sf.id)}
+            >
+              {sf.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {isLoading ? <LoadingSkeleton rows={5} /> : filteredComplaints.length
-        ? <ComplaintList complaints={filteredComplaints} />
-        : <EmptyState title={complaints.length ? "No matching complaints" : "No complaints yet"}
-          description={complaints.length ? "Try adjusting the search or filters." : "Submit a complaint to start tracking its progress."}
-          action={complaints.length ? <button type="button" className="button button-secondary button-small" onClick={clearFilters}>Clear filters</button>
-            : <button type="button" className="button button-primary button-small" onClick={() => setFormOpen(true)}>Create complaint</button>} />}
-    </section>
-  </AppShell>;
+      {/* Main Content Area */}
+      {isLoading ? (
+        <LoadingSkeleton rows={5} />
+      ) : filteredComplaints.length > 0 ? (
+        <ComplaintList complaints={filteredComplaints} />
+      ) : (
+        <EmptyState
+          title={complaints.length > 0 ? "No matching grievances found" : "No grievances logged"}
+          description={
+            complaints.length > 0 
+              ? "No records matched your current query or department filter." 
+              : "Raise your first grievance to initiate automated department dispatch."
+          }
+          action={
+            complaints.length > 0 ? (
+              <button className="btn btn-secondary btn-small" type="button" onClick={clearFilters}>
+                Clear All Filters
+              </button>
+            ) : (
+              <button className="btn btn-primary btn-small" type="button" onClick={() => setModalOpen(true)}>
+                <Plus size={14} /> Raise Grievance
+              </button>
+            )
+          }
+        />
+      )}
+
+      {/* Modern Modal: Log New Grievance */}
+      {modalOpen && (
+        <div className="modal-backdrop" onClick={() => setModalOpen(false)}>
+          <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <span style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.08em", color: "var(--accent-blue)", textTransform: "uppercase" }}>
+                  INTAKE PORTAL
+                </span>
+                <h2 style={{ fontSize: "1.3rem", marginTop: "2px" }}>Raise Service Grievance</h2>
+              </div>
+              <button className="icon-button" type="button" onClick={() => setModalOpen(false)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={submitComplaint}>
+              <div className="modal-body">
+                {formError && (
+                  <div style={{ background: "rgba(244, 63, 94, 0.12)", border: "1px solid rgba(244, 63, 94, 0.3)", borderRadius: "var(--radius-md)", padding: "10px 14px", color: "#FDA4AF", fontSize: "0.84rem" }}>
+                    {formError}
+                  </div>
+                )}
+
+                <div className="form-group">
+                  <label htmlFor="comp-title">Issue Summary / Title</label>
+                  <input
+                    id="comp-title"
+                    className="form-control"
+                    placeholder="e.g. Finance database connectivity failure in EMEA region"
+                    value={form.title}
+                    onChange={(e) => setForm({ ...form, title: e.target.value })}
+                    maxLength={120}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Select Target Department</label>
+                  <div className="visual-option-grid">
+                    {departments.map((dept) => {
+                      const IconComp = dept.icon;
+                      const isSelected = form.department === dept.id;
+                      return (
+                        <div
+                          key={dept.id}
+                          className={`visual-option-card ${isSelected ? "selected" : ""}`}
+                          onClick={() => setForm({ ...form, department: dept.id })}
+                        >
+                          <div style={{ color: isSelected ? "var(--accent-blue)" : "var(--text-muted)" }}>
+                            <IconComp size={20} />
+                          </div>
+                          <div>
+                            <strong>{dept.id}</strong>
+                            <small>{dept.desc}</small>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Priority & Service Level Agreement (SLA)</label>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px" }}>
+                    {priorities.map((p) => {
+                      const isSelected = form.priority === p.id;
+                      return (
+                        <div
+                          key={p.id}
+                          style={{
+                            background: isSelected ? "rgba(59, 130, 246, 0.12)" : "var(--bg-app)",
+                            border: isSelected ? "1px solid var(--accent-blue)" : "1px solid var(--border-subtle)",
+                            borderRadius: "var(--radius-md)",
+                            padding: "10px 8px",
+                            textAlign: "center",
+                            cursor: "pointer",
+                            transition: "all 0.2s ease"
+                          }}
+                          onClick={() => setForm({ ...form, priority: p.id })}
+                        >
+                          <div style={{ fontSize: "0.78rem", fontWeight: 700, color: p.color }}>
+                            {p.label}
+                          </div>
+                          <div style={{ fontSize: "0.68rem", color: "var(--text-muted)", marginTop: "2px" }}>
+                            {p.sla}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="comp-desc">Grievance Details & Impact</label>
+                  <textarea
+                    id="comp-desc"
+                    className="form-control"
+                    placeholder="Provide details of the outage, impacted systems, steps to reproduce, or urgent requirements..."
+                    value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    rows={4}
+                    maxLength={2000}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button 
+                  className="btn btn-secondary" 
+                  type="button" 
+                  onClick={() => setModalOpen(false)}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </button>
+                <button 
+                  className="btn btn-primary" 
+                  type="submit" 
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? "Submitting..." : "Submit Grievance"}
+                  {!isSubmitting && <ArrowRight size={16} />}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </AppShell>
+  );
 }
 
 export default Complaints;

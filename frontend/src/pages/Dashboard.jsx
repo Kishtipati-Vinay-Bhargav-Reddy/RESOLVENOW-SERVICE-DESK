@@ -1,40 +1,67 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { 
+  FileText, 
+  Clock, 
+  CheckCircle2, 
+  AlertTriangle, 
+  ShieldAlert, 
+  Layers, 
+  RotateCw, 
+  Plus, 
+  ArrowRight, 
+  Building2
+} from "lucide-react";
 import AppShell from "../components/AppShell";
 import ComplaintList from "../components/ComplaintList";
-import { EmptyState, ErrorState, LoadingSkeleton, PageHeader } from "../components/Feedback";
+import { ErrorState, LoadingSkeleton, PageHeader } from "../components/Feedback";
 import NotificationList from "../components/NotificationList";
 import StatCard from "../components/StatCard";
-import Icon from "../components/Icon";
-import { getAssignments, getCollection, getComplaints, getErrorMessage, getNotifications, markNotificationRead } from "../services/api";
+import { 
+  getAssignments, 
+  getCollection, 
+  getComplaints, 
+  getErrorMessage, 
+  getNotifications, 
+  markNotificationRead,
+  getComplaintStats 
+} from "../services/api";
 import { useToast } from "../components/ToastContext";
 import { useNotificationCount } from "../components/NotificationCountContext";
-
-const statuses = [["OPEN", "Open"], ["ASSIGNED", "Assigned"], ["IN_PROGRESS", "In progress"], ["RESOLVED", "Resolved"], ["CLOSED", "Closed"]];
-const statusOf = (complaint) => String(complaint.status || "OPEN").toUpperCase();
 
 function Dashboard({ username, user, onLogout }) {
   const navigate = useNavigate();
   const showToast = useToast();
   const { unreadCount, refreshUnreadCount } = useNotificationCount();
+  
   const [complaints, setComplaints] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [markingIds, setMarkingIds] = useState([]);
 
+  const role = String(user?.role || "USER").toUpperCase();
+
   useEffect(() => {
     let active = true;
-    Promise.allSettled([getComplaints(), getAssignments(), getNotifications()])
+    Promise.allSettled([
+      getComplaints(), 
+      getAssignments(), 
+      getNotifications(),
+      getComplaintStats()
+    ])
       .then((results) => {
         if (!active) return;
-        const [complaintResult, assignmentResult, notificationResult] = results;
+        const [complaintResult, assignmentResult, notificationResult, statsResult] = results;
         if (complaintResult.status === "fulfilled") setComplaints(getCollection(complaintResult.value));
         if (assignmentResult.status === "fulfilled") setAssignments(getCollection(assignmentResult.value));
         if (notificationResult.status === "fulfilled") setNotifications(getCollection(notificationResult.value));
+        if (statsResult.status === "fulfilled") setStats(statsResult.value.data);
+        
         const failed = results.find((result) => result.status === "rejected");
         setError(failed ? getErrorMessage(failed.reason) : "");
       })
@@ -50,93 +77,256 @@ function Dashboard({ username, user, onLogout }) {
   const refresh = () => {
     setRefreshing(true);
     setError("");
-    setRefreshKey((value) => value + 1);
+    setRefreshKey((v) => v + 1);
   };
-  const statusCount = (status) => complaints.filter((complaint) => statusOf(complaint) === status).length;
-  const overdueCount = complaints.filter((complaint) => complaint.overdue).length;
-  const escalatedCount = complaints.filter((complaint) => complaint.escalated).length;
-
-  const recentComplaints = [...complaints].sort((left, right) =>
-    new Date(right.updatedAt || right.createdAt) - new Date(left.updatedAt || left.createdAt)).slice(0, 6);
-  const recentNotifications = [...notifications].sort((left, right) =>
-    new Date(right.createdAt) - new Date(left.createdAt)).slice(0, 5);
 
   const markRead = async (id) => {
-    setMarkingIds((current) => [...current, id]);
+    setMarkingIds((curr) => [...curr, id]);
     try {
       const { data } = await markNotificationRead(id);
-      setNotifications((current) => current.map((item) => (item.notificationId || item.id) === id ? data : item));
+      setNotifications((curr) => curr.map((item) => (item.notificationId || item.id) === id ? data : item));
       await refreshUnreadCount();
       showToast("Notification marked as read.");
     } catch (requestError) {
       showToast(getErrorMessage(requestError), "error");
     } finally {
-      setMarkingIds((current) => current.filter((value) => value !== id));
+      setMarkingIds((curr) => curr.filter((v) => v !== id));
     }
   };
 
-  const maxStatusCount = Math.max(1, ...statuses.map(([status]) => statusCount(status)));
+  const statusCount = (status) => {
+    if (stats?.statusCounts && stats.statusCounts[status] != null) {
+      return stats.statusCounts[status];
+    }
+    return complaints.filter((c) => String(c.status || "OPEN").toUpperCase() === status).length;
+  };
 
-  return <AppShell activeItem="Dashboard" username={username} role={user?.role} onLogout={onLogout}>
-    <PageHeader eyebrow="SERVICE DESK / OVERVIEW" title={`Good morning, ${username || "there"}`}
-      description="Your current complaints, assignments, and service activity."
-      actions={<button className="button button-secondary" type="button" onClick={refresh} disabled={refreshing}>
-        <span className={refreshing ? "spin-icon" : ""}>↻</span>{refreshing ? "Refreshing" : "Refresh"}
-      </button>} />
+  const overdueCount = stats?.overdueCount ?? complaints.filter((c) => c.overdue).length;
+  const escalatedCount = stats?.escalatedCount ?? complaints.filter((c) => c.escalated).length;
+  const totalCount = stats?.totalComplaints ?? complaints.length;
 
-    {error && <ErrorState title="Some dashboard information could not be loaded." detail={error} onRetry={refresh} />}
-    {loading ? <><LoadingSkeleton rows={1} variant="cards" /><LoadingSkeleton rows={4} /></> : <>
-      <section className="stat-grid" aria-label="Complaint totals">
-        <StatCard label="Total complaints" value={complaints.length} tone="navy" icon="complaints" />
-        <StatCard label="Open" value={statusCount("OPEN")} tone="blue" icon="clock" />
-        <StatCard label="Assigned" value={statusCount("ASSIGNED")} tone="amber" icon="assignments" />
-        <StatCard label="In progress" value={statusCount("IN_PROGRESS")} tone="violet" icon="refresh" />
-        <StatCard label="Resolved" value={statusCount("RESOLVED")} tone="green" icon="check" />
-        <StatCard label="Closed" value={statusCount("CLOSED")} tone="slate" icon="close" />
-        <StatCard label="Escalated" value={escalatedCount} tone="amber" icon="warning" />
-        <StatCard label="Overdue SLA" value={overdueCount} tone="red" icon="clock" />
-      </section>
+  const recentComplaints = [...complaints]
+    .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
+    .slice(0, 5);
 
-      <section className="status-overview surface" aria-labelledby="status-overview-title">
-        <div className="section-heading section-heading-tight">
-          <div><p className="eyebrow">LIFECYCLE</p><h2 id="status-overview-title">Status overview</h2></div>
-          <span className="section-count">{complaints.length} complaints</span>
-        </div>
-        <div className="status-bars">
-          {statuses.map(([status, label]) => <div className="status-bar-row" key={status}>
-            <span>{label}</span><div className="status-bar-track"><span className={`status-bar-fill fill-${status.toLowerCase()}`}
-              style={{ width: `${(statusCount(status) / maxStatusCount) * 100}%` }} /></div><strong>{statusCount(status)}</strong>
-          </div>)}
-        </div>
-      </section>
+  const recentNotifications = [...notifications]
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 5);
 
-      <div className="dashboard-columns">
-        <section className="surface recent-complaints" aria-labelledby="recent-complaints-title">
-          <div className="section-heading">
-            <div><p className="eyebrow">WORK IN FLIGHT</p><h2 id="recent-complaints-title">Recent complaints</h2></div>
-            <Link className="text-link" to="/complaints">View register <span aria-hidden="true">→</span></Link>
+  return (
+    <AppShell activeItem="Dashboard" username={username} role={user?.role} onLogout={onLogout}>
+      <PageHeader
+        eyebrow="ENTERPRISE WORKSPACE / ANALYTICS"
+        title={`Welcome back, ${username || "Member"}`}
+        description={
+          role === "ADMIN"
+            ? "Executive Command Center — Real-time metrics across all corporate service desks."
+            : role === "STAFF"
+            ? "Support Agent Workspace — Handling assigned department queues and SLA resolution lifecycles."
+            : "Employee Service Portal — Track your active grievances, review department actions, and monitor SLA progress."
+        }
+        actions={
+          <div style={{ display: "flex", gap: "10px" }}>
+            <button className="btn btn-secondary" type="button" onClick={refresh} disabled={refreshing}>
+              <RotateCw size={15} className={refreshing ? "spin-slow" : ""} />
+              <span>{refreshing ? "Syncing..." : "Sync Data"}</span>
+            </button>
+            <button className="btn btn-primary" type="button" onClick={() => navigate("/complaints")}>
+              <Plus size={16} />
+              <span>Log Grievance</span>
+            </button>
           </div>
-          {recentComplaints.length ? <ComplaintList complaints={recentComplaints} />
-            : <EmptyState title="No complaints logged" description="New complaints will appear here."
-              action={<button className="button button-primary button-small" type="button" onClick={() => navigate("/complaints")}>Report an issue</button>} />}
-        </section>
+        }
+      />
 
-        <section className="surface recent-notifications" aria-labelledby="recent-activity-title">
-          <div className="section-heading">
-            <div><p className="eyebrow">ACTIVITY FEED</p><h2 id="recent-activity-title">Notifications</h2></div>
-            <span className="section-count">{unreadCount} unread</span>
+      {error && <ErrorState title="Telemetry connection notice" detail={error} onRetry={refresh} />}
+
+      {loading ? (
+        <LoadingSkeleton rows={4} />
+      ) : (
+        <>
+          {/* Top Metric Cards Grid */}
+          <section className="stats-grid" aria-label="Key Performance Indicators">
+            <StatCard
+              label="Active Grievances"
+              value={totalCount}
+              tone="blue"
+              icon={FileText}
+              trend="+100% SLA target"
+              caption="Live records in database"
+            />
+            <StatCard
+              label="Pending Assignment / Work"
+              value={statusCount("OPEN") + statusCount("ASSIGNED") + statusCount("IN_PROGRESS")}
+              tone="amber"
+              icon={Clock}
+              caption="In active lifecycle"
+            />
+            <StatCard
+              label="Resolved & Closed"
+              value={statusCount("RESOLVED") + statusCount("CLOSED")}
+              tone="emerald"
+              icon={CheckCircle2}
+              trend="Target achieved"
+              caption="Successfully completed"
+            />
+            <StatCard
+              label="Escalated Incidents"
+              value={escalatedCount}
+              tone={escalatedCount > 0 ? "rose" : "purple"}
+              icon={ShieldAlert}
+              caption={escalatedCount > 0 ? "Requires urgent review" : "No priority escalations"}
+            />
+            <StatCard
+              label="SLA Deadline Breaches"
+              value={overdueCount}
+              tone={overdueCount > 0 ? "rose" : "blue"}
+              icon={AlertTriangle}
+              caption={overdueCount > 0 ? "Immediate attention required" : "All tickets within SLA"}
+            />
+          </section>
+
+          {/* Department Breakdown Visual Ribbon */}
+          {stats?.departmentCounts && (
+            <div 
+              style={{
+                background: "var(--bg-surface)",
+                border: "1px solid var(--border-subtle)",
+                borderRadius: "var(--radius-lg)",
+                padding: "20px 24px",
+                marginBottom: "32px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "14px"
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "0.78rem", fontWeight: 700, letterSpacing: "0.08em", color: "var(--text-muted)", textTransform: "uppercase" }}>
+                  Department Distribution & Workload Dispatch
+                </span>
+                <span style={{ fontSize: "0.82rem", color: "var(--accent-blue)", fontWeight: 600 }}>
+                  Automated Routing Active
+                </span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
+                {Object.entries(stats.departmentCounts).map(([dept, count]) => (
+                  <div
+                    key={dept}
+                    style={{
+                      background: "var(--bg-app)",
+                      border: "1px solid var(--border-subtle)",
+                      borderRadius: "var(--radius-md)",
+                      padding: "12px 16px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between"
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <Building2 size={16} style={{ color: "var(--accent-indigo)" }} />
+                      <strong style={{ fontSize: "0.88rem" }}>{dept}</strong>
+                    </div>
+                    <span style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--accent-blue)" }}>
+                      {count}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Split Dashboard Columns */}
+          <div style={{ display: "grid", gridTemplateColumns: "1.9fr 1fr", gap: "28px" }}>
+            {/* Left: Recent Complaints Grid */}
+            <section style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <h2 style={{ fontSize: "1.25rem", fontWeight: 700 }}>In-Flight Service Grievances</h2>
+                  <p style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>
+                    Real-time status of recently reported issues.
+                  </p>
+                </div>
+                <Link className="btn btn-ghost btn-small" to="/complaints">
+                  View All Register <ArrowRight size={14} />
+                </Link>
+              </div>
+
+              <ComplaintList
+                complaints={recentComplaints}
+                emptyTitle="No issues reported yet"
+                emptyDescription="Your registered workspace has no active issues. Submit a grievance to trigger automatic department assignment."
+              />
+            </section>
+
+            {/* Right: Live Activity & Task Feed */}
+            <section style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <h2 style={{ fontSize: "1.25rem", fontWeight: 700 }}>Audit & Alerts</h2>
+                  <p style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>
+                    {unreadCount} unread automated notification(s).
+                  </p>
+                </div>
+                <Link className="btn btn-ghost btn-small" to="/notifications">
+                  Open Inbox <ArrowRight size={14} />
+                </Link>
+              </div>
+
+              <NotificationList
+                notifications={recentNotifications}
+                onMarkRead={markRead}
+                markingIds={markingIds}
+                limit={5}
+              />
+
+              {/* Assignments Queue Banner */}
+              <div 
+                style={{ 
+                  background: "linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(59, 130, 246, 0.08))",
+                  border: "1px solid rgba(99, 102, 241, 0.25)",
+                  borderRadius: "var(--radius-lg)",
+                  padding: "18px 20px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "12px",
+                  marginTop: "8px"
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <div 
+                    style={{ 
+                      width: "36px", 
+                      height: "36px", 
+                      borderRadius: "var(--radius-md)", 
+                      background: "rgba(99, 102, 241, 0.2)", 
+                      color: "#818CF8", 
+                      display: "flex", 
+                      alignItems: "center", 
+                      justifyContent: "center" 
+                    }}
+                  >
+                    <Layers size={18} />
+                  </div>
+                  <div>
+                    <strong style={{ fontSize: "0.9rem", color: "var(--text-primary)", display: "block" }}>
+                      {assignments.length} Tasks in Assignment Queue
+                    </strong>
+                    <small style={{ fontSize: "0.76rem", color: "var(--text-secondary)" }}>
+                      Department dispatch handled by Assignment Service
+                    </small>
+                  </div>
+                </div>
+                <Link className="btn btn-secondary btn-small" to="/assignments">
+                  View Queue
+                </Link>
+              </div>
+            </section>
           </div>
-          {recentNotifications.length
-            ? <NotificationList notifications={recentNotifications} onMarkRead={markRead} markingIds={markingIds} limit={5} />
-            : <EmptyState title="No activity recorded" description="Assignment and complaint events will show up here." />}
-          <div className="assignment-summary">
-            <Icon name="assignments" size={17} /><span><strong>{assignments.length}</strong> active assignments in queue.</span>
-            <Link className="text-link" to="/assignments">Open queue <span aria-hidden="true">→</span></Link>
-          </div>
-        </section>
-      </div>
-    </>}
-  </AppShell>;
+        </>
+      )}
+    </AppShell>
+  );
 }
 
 export default Dashboard;

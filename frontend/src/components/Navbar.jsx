@@ -1,13 +1,24 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { 
+  Search, 
+  Bell, 
+  Menu, 
+  X, 
+  LogOut, 
+  ShieldCheck, 
+  Headphones, 
+  UserCheck 
+} from "lucide-react";
 import { useNotificationCount } from "./NotificationCountContext";
-import Icon from "./Icon";
 
 function Navbar({ username, role, onLogout, onMenuToggle, menuOpen, menuButtonRef }) {
   const navigate = useNavigate();
   const { unreadCount } = useNotificationCount();
   const [query, setQuery] = useState("");
   const searchInputRef = useRef(null);
+
+  const normalizedRole = String(role || "USER").toUpperCase();
 
   useEffect(() => {
     const focusSearch = (event) => {
@@ -30,33 +41,100 @@ function Navbar({ username, role, onLogout, onMenuToggle, menuOpen, menuButtonRe
     setQuery("");
   };
 
+  const getRoleBadge = () => {
+    if (normalizedRole === "ADMIN") {
+      return (
+        <span className="role-badge-header role-badge-admin">
+          <ShieldCheck size={12} /> Command Center
+        </span>
+      );
+    }
+    if (normalizedRole === "STAFF") {
+      return (
+        <span className="role-badge-header role-badge-staff">
+          <Headphones size={12} /> Agent Workspace
+        </span>
+      );
+    }
+    return (
+      <span className="role-badge-header role-badge-user">
+        <UserCheck size={12} /> Employee Portal
+      </span>
+    );
+  };
+
   return (
     <header className="topbar">
-      <button ref={menuButtonRef} className="mobile-menu-button icon-button" type="button" aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
-        aria-expanded={menuOpen} onClick={onMenuToggle}><Icon name={menuOpen ? "close" : "menu"} /></button>
-      <div className="brand-lockup">
-        <Link className="brand-mark" to="/dashboard" aria-label="ResolveNow dashboard">RN</Link>
-        <div>
-          <strong>ResolveNow</strong>
-          <span>ISSUE ESCALATION & SERVICE DESK</span>
+      <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+        <button
+          ref={menuButtonRef}
+          className="icon-button"
+          type="button"
+          aria-label={menuOpen ? "Close menu" : "Open menu"}
+          aria-expanded={menuOpen}
+          onClick={onMenuToggle}
+        >
+          {menuOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+
+        <Link className="brand-lockup" to="/dashboard" aria-label="ResolveNow Dashboard">
+          <div className="brand-mark">RN</div>
+          <div>
+            <strong>ResolveNow</strong>
+            <span>ENTERPRISE SERVICE DESK</span>
+          </div>
+        </Link>
+
+        <div style={{ marginLeft: "8px" }}>
+          {getRoleBadge()}
         </div>
       </div>
+
       <form className="global-search" role="search" onSubmit={handleSearch}>
-        <Icon name="search" size={18} />
-        <input ref={searchInputRef} aria-label="Search complaints" placeholder="Search complaints" value={query}
-          onChange={(event) => setQuery(event.target.value)} />
+        <Search size={16} />
+        <input
+          ref={searchInputRef}
+          aria-label="Search grievances & incidents"
+          placeholder="Search tickets, incidents, departments..."
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
         <kbd>/</kbd>
       </form>
+
       <div className="topbar-actions">
-        <Link className="notification-button icon-button" to="/notifications" aria-label={`Notifications, ${unreadCount} unread`} title="Notifications">
-          <Icon name="notifications" size={19} />
-          {unreadCount > 0 && <span className="notification-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>}
+        <Link 
+          className="icon-button" 
+          to="/notifications" 
+          aria-label={`Notifications, ${unreadCount} unread`} 
+          title="Notifications"
+        >
+          <Bell size={18} />
+          {unreadCount > 0 && (
+            <span className="notification-badge">
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          )}
         </Link>
-        <Link className="user-chip" to="/profile" aria-label="Open profile">
-          <span className="avatar">{username?.charAt(0).toUpperCase() || "U"}</span>
-          <span className="user-chip-copy"><strong>{username || "User"}</strong><small>{role || "Account"}</small></span>
+
+        <Link className="user-chip" to="/profile" aria-label="Open User Profile">
+          <div className="avatar">
+            {username ? username.charAt(0).toUpperCase() : "U"}
+          </div>
+          <div className="user-chip-copy">
+            <strong>{username || "User"}</strong>
+            <small>{normalizedRole}</small>
+          </div>
         </Link>
-        <button className="outline-button topbar-logout" type="button" onClick={onLogout}>Sign out</button>
+
+        <button 
+          className="btn btn-ghost btn-small" 
+          type="button" 
+          onClick={onLogout} 
+          title="Sign out of session"
+        >
+          <LogOut size={16} />
+        </button>
       </div>
     </header>
   );

@@ -1,10 +1,20 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { 
+  ArrowLeft, 
+  RotateCw, 
+  Building2, 
+  Clock, 
+  ShieldAlert, 
+  CheckCircle2, 
+  ArrowRight,
+  FileText,
+  History,
+  X
+} from "lucide-react";
 import AppShell from "../components/AppShell";
-import ConfirmDialog from "../components/ConfirmDialog";
 import { ErrorState, LoadingSkeleton, PageHeader } from "../components/Feedback";
-import Icon from "../components/Icon";
-import StatusBadge from "../components/StatusBadge";
+import { StatusBadge, PriorityBadge, EscalationBadge, OverdueBadge } from "../components/StatusBadge";
 import { useToast } from "../components/ToastContext";
 import {
   escalateComplaint,
@@ -15,26 +25,27 @@ import {
   getErrorMessage,
   updateComplaintStatus,
 } from "../services/api";
-import { formatDateTime } from "../utils/date";
+import { formatDateTime, formatRelativeTime } from "../utils/date";
 
 const transitions = {
-  OPEN: ["ASSIGNED"],
+  OPEN: ["ASSIGNED", "IN_PROGRESS"],
   ASSIGNED: ["IN_PROGRESS"],
   IN_PROGRESS: ["RESOLVED"],
   RESOLVED: ["CLOSED"],
   CLOSED: [],
 };
+
 const actionLabels = {
-  ASSIGNED: "Mark assigned",
-  IN_PROGRESS: "Start work",
-  RESOLVED: "Resolve complaint",
-  CLOSED: "Close complaint",
+  ASSIGNED: "Mark Assigned",
+  IN_PROGRESS: "Start Investigation / Work",
+  RESOLVED: "Mark as Resolved",
+  CLOSED: "Confirm & Close Grievance",
 };
 
 function ComplaintDetails({ username, user, onLogout }) {
   const { id } = useParams();
-  const navigate = useNavigate();
   const showToast = useToast();
+
   const [complaint, setComplaint] = useState(null);
   const [history, setHistory] = useState([]);
   const [assignment, setAssignment] = useState(null);
@@ -42,24 +53,36 @@ function ComplaintDetails({ username, user, onLogout }) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
-  const [nextStatus, setNextStatus] = useState(null);
-  const [updating, setUpdating] = useState(false);
-  const [escalationDialogOpen, setEscalationDialogOpen] = useState(false);
+
+  // Status update state
+  const [statusNote, setStatusNote] = useState("");
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  // Escalation state
+  const [escalationModalOpen, setEscalationModalOpen] = useState(false);
   const [escalationReason, setEscalationReason] = useState("");
+  const [escalationLevel, setEscalationLevel] = useState(1);
   const [escalating, setEscalating] = useState(false);
 
   useEffect(() => {
     let active = true;
-    Promise.allSettled([getComplaint(id), getComplaintHistory(id), getAssignments()])
-      .then(([complaintResult, historyResult, assignmentResult]) => {
+    Promise.allSettled([
+      getComplaint(id), 
+      getComplaintHistory(id), 
+      getAssignments()
+    ])
+      .then(([compRes, histRes, assignRes]) => {
         if (!active) return;
-        if (complaintResult.status === "fulfilled") setComplaint(complaintResult.value.data);
-        else setError(getErrorMessage(complaintResult.reason));
-        if (historyResult.status === "fulfilled") setHistory(getCollection(historyResult.value));
-        else setError(getErrorMessage(historyResult.reason));
-        if (assignmentResult.status === "fulfilled") {
-          const matching = getCollection(assignmentResult.value).find((item) => String(item.complaintId) === String(id));
-          setAssignment(matching || null);
+        if (compRes.status === "fulfilled") setComplaint(compRes.value.data);
+        else setError(getErrorMessage(compRes.reason));
+
+        if (histRes.status === "fulfilled") setHistory(getCollection(histRes.value));
+        else setError(getErrorMessage(histRes.reason));
+
+        if (assignRes.status === "fulfilled") {
+          const list = getCollection(assignRes.value);
+          const found = list.find((item) => String(item.complaintId) === String(id));
+          setAssignment(found || null);
         }
       })
       .finally(() => {
@@ -74,175 +97,439 @@ function ComplaintDetails({ username, user, onLogout }) {
   const refresh = () => {
     setRefreshing(true);
     setError("");
-    setRefreshKey((value) => value + 1);
+    setRefreshKey((v) => v + 1);
   };
 
-  const commitStatus = async () => {
-    if (!nextStatus) return;
-    setUpdating(true);
+  const handleUpdateStatus = async (statusToSet) => {
+    if (!statusToSet) return;
+    setUpdatingStatus(true);
     try {
-      const { data } = await updateComplaintStatus(id, nextStatus);
+      const { data } = await updateComplaintStatus(id, statusToSet, statusNote.trim());
       setComplaint(data);
-      setNextStatus(null);
-      showToast(`Complaint moved to ${nextStatus.replaceAll("_", " ").toLowerCase()}.`);
+      setTargetStatus("");
+      setStatusNote("");
+      showToast(`Grievance transitioned to ${statusToSet.replaceAll("_", " ")}.`);
       refresh();
-      window.dispatchEvent(new Event("servicedesk:changed"));
-    } catch (requestError) {
-      showToast(getErrorMessage(requestError), "error");
+      window.dispatchEvent(new Event("notifications:changed"));
+    } catch (err) {
+      showToast(getErrorMessage(err), "error");
     } finally {
-      setUpdating(false);
+      setUpdatingStatus(false);
     }
   };
 
-  const commitEscalation = async () => {
+  const handleEscalate = async (e) => {
+    e.preventDefault();
     if (!escalationReason.trim()) {
-      showToast("Please provide a reason for escalation.", "error");
+      showToast("Please provide a business justification for escalation.", "error");
       return;
     }
     setEscalating(true);
     try {
-      const { data } = await escalateComplaint(id, { reason: escalationReason.trim() });
+      const { data } = await escalateComplaint(id, {
+        reason: escalationReason.trim(),
+        level: Number(escalationLevel) || 1,
+      });
       setComplaint(data);
-      setEscalationDialogOpen(false);
+      setEscalationModalOpen(false);
       setEscalationReason("");
-      showToast("Complaint has been escalated.");
+      showToast(`Grievance escalated to Level ${escalationLevel}.`);
       refresh();
       window.dispatchEvent(new Event("notifications:changed"));
-    } catch (requestError) {
-      showToast(getErrorMessage(requestError), "error");
+    } catch (err) {
+      showToast(getErrorMessage(err), "error");
     } finally {
       setEscalating(false);
     }
   };
 
   const currentStatus = String(complaint?.status || "OPEN").toUpperCase();
-  const allowedNextStatuses = transitions[currentStatus] || [];
-  const isOwner = Number(user?.userId) === Number(complaint?.userId);
-  const isStaff = ["ADMIN", "STAFF", "AGENT", "SUPPORT_AGENT", "DEPARTMENT_MANAGER", "ROLE_ADMIN", "ROLE_STAFF", "ROLE_AGENT"].includes(String(user?.role || "").toUpperCase());
-  const allowedStatuses = isStaff ? allowedNextStatuses : (isOwner && currentStatus === "RESOLVED" ? ["CLOSED"] : []);
-  const mayUpdate = isStaff || (isOwner && currentStatus === "RESOLVED");
-  const orderedHistory = [...history].sort((left, right) => new Date(left.changedAt) - new Date(right.changedAt));
+  const allowedNext = transitions[currentStatus] || [];
+  const isOwner = Number(user?.userId) === Number(complaint?.userId) || username === complaint?.username;
+  const isStaff = ["ADMIN", "STAFF"].includes(String(user?.role || "").toUpperCase());
+  const canClose = isOwner && currentStatus === "RESOLVED";
 
-  return <AppShell activeItem="Complaints" username={username} role={user?.role} onLogout={onLogout}>
-    <div className="breadcrumb"><Link to="/complaints">Complaints</Link><span>/</span><span>#{id}</span></div>
-    {loading ? <LoadingSkeleton rows={5} /> : error && !complaint ? <ErrorState title="Unable to load this complaint." detail={error}
-      onRetry={refresh} /> : complaint && <>
-      <PageHeader eyebrow={`COMPLAINT / #${complaint.id}`} title={complaint.title}
-        description={`${complaint.department} department · Reported by ${complaint.username || "account owner"}`}
-        actions={<>
-          {complaint.escalated && <span className="status-badge status-escalated">L{complaint.escalationLevel} Escalated</span>}
-          {complaint.overdue && <span className="status-badge status-overdue">Overdue</span>}
-          <StatusBadge status={complaint.status} />
-          <button className="button button-secondary" type="button" onClick={refresh} disabled={refreshing}>
-            <Icon name="refresh" size={17} />{refreshing ? "Refreshing" : "Refresh"}</button>
-        </>} />
-      {error && <ErrorState title="Some complaint details could not be refreshed." detail={error} onRetry={refresh} />}
+  const orderedHistory = [...history].sort(
+    (a, b) => new Date(a.changedAt) - new Date(b.changedAt)
+  );
 
-      <div className="complaint-detail-layout">
-        <div className="complaint-detail-main">
-          <section className="surface detail-section">
-            <div className="section-heading"><div><p className="eyebrow">ISSUE SUMMARY</p><h2>Complaint details</h2></div></div>
-            <dl className="detail-grid">
-              <div className="detail-field detail-field-wide"><dt>Title</dt><dd>{complaint.title}</dd></div>
-              <div className="detail-field detail-field-wide"><dt>Description</dt><dd className="detail-description">{complaint.description}</dd></div>
-              <div className="detail-field"><dt>Department</dt><dd>{complaint.department}</dd></div>
-              <div className="detail-field"><dt>Priority</dt><dd><StatusBadge status={complaint.priority || "MEDIUM"} /></dd></div>
-              <div className="detail-field"><dt>Owner</dt><dd>{complaint.username || "You"}</dd></div>
-              <div className="detail-field"><dt>Created</dt><dd>{formatDateTime(complaint.createdAt)}</dd></div>
-              <div className="detail-field"><dt>SLA Target</dt><dd>{complaint.slaDeadline ? formatDateTime(complaint.slaDeadline) : "Standard"} {complaint.overdue && <span className="status-badge status-overdue">Overdue</span>}</dd></div>
-              <div className="detail-field"><dt>Last updated</dt><dd>{formatDateTime(complaint.updatedAt)}</dd></div>
-              {complaint.escalated && (
-                <div className="detail-field detail-field-wide">
-                  <dt>Escalation Details</dt>
-                  <dd>
-                    <span className="status-badge status-escalated">Level {complaint.escalationLevel}</span>
-                    {complaint.escalationReason ? ` — ${complaint.escalationReason}` : ""}
-                    {complaint.escalatedAt ? ` (${formatDateTime(complaint.escalatedAt)})` : ""}
-                  </dd>
-                </div>
-              )}
-            </dl>
-          </section>
+  return (
+    <AppShell activeItem="Complaints" username={username} role={user?.role} onLogout={onLogout}>
+      {/* Back navigation & header */}
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
+        <Link className="btn btn-ghost btn-small" to="/complaints">
+          <ArrowLeft size={16} /> Back to Grievances
+        </Link>
+        <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>/</span>
+        <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>Ticket #{id}</span>
+      </div>
 
-          <section className="surface detail-section timeline-section">
-            <div className="section-heading"><div><p className="eyebrow">AUDIT TRAIL</p><h2>Status history</h2></div><span className="section-count">{orderedHistory.length} events</span></div>
-            {orderedHistory.length ? <ol className="status-timeline">
-              {orderedHistory.map((event) => <li className="timeline-event" key={event.id}>
-                <span className="timeline-marker"><Icon name="check" size={14} /></span>
-                <div className="timeline-event-content">
-                  <div className="timeline-event-heading">
-                    <strong>{event.actionNote || (event.fromStatus ? `${event.fromStatus.replaceAll("_", " ")} → ` : "Created as ") + event.toStatus?.replaceAll("_", " ")}</strong>
-                    <time dateTime={event.changedAt}>{formatDateTime(event.changedAt)}</time>
-                  </div>
-                  <span>Changed by {event.changedByUsername || "Service Desk"}</span>
-                </div>
-              </li>)}
-            </ol> : <p className="muted-note">No status history available.</p>}
-          </section>
-        </div>
+      {loading ? (
+        <LoadingSkeleton rows={5} />
+      ) : error && !complaint ? (
+        <ErrorState title="Unable to retrieve grievance" detail={error} onRetry={refresh} />
+      ) : complaint && (
+        <>
+          <PageHeader
+            eyebrow={`TICKET IDENTIFIER #${complaint.id}`}
+            title={complaint.title}
+            description={`Submitted by ${complaint.username || "You"} • ${complaint.department} Department`}
+            actions={
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <StatusBadge status={complaint.status} />
+                <PriorityBadge priority={complaint.priority} />
+                {complaint.escalated && (
+                  <EscalationBadge level={complaint.escalationLevel} reason={complaint.escalationReason} />
+                )}
+                {complaint.overdue && <OverdueBadge />}
+                <button className="btn btn-secondary btn-small" type="button" onClick={refresh} disabled={refreshing}>
+                  <RotateCw size={14} className={refreshing ? "spin-slow" : ""} />
+                </button>
+              </div>
+            }
+          />
 
-        <aside className="complaint-detail-side">
-          <section className="surface detail-section">
-            <div className="section-heading"><div><p className="eyebrow">CURRENT STATE</p><h2>Actions</h2></div></div>
-            <div className="current-status-line"><span>Status</span><StatusBadge status={complaint.status} /></div>
-            {allowedStatuses.length ? <div className="status-action-list">
-              {allowedStatuses.map((status) => <button className={`button ${status === "CLOSED" ? "button-secondary" : "button-primary"}`} type="button"
-                key={status} onClick={() => setNextStatus(status)}>{actionLabels[status]}</button>)}
-            </div> : <p className="muted-note">
-              {currentStatus === "CLOSED"
-                ? "This complaint has reached its final status."
-                : isOwner && !isStaff
-                  ? "This complaint is being processed by the service desk. You can close it once it is marked resolved."
-                  : "Only service staff or the ticket owner can change status."}
-            </p>}
+          {error && <ErrorState title="Notice" detail={error} onRetry={refresh} />}
 
-            {mayUpdate && currentStatus !== "CLOSED" && (
-              <div style={{ padding: "0 20px 16px" }}>
-                {!escalationDialogOpen ? (
-                  <button className="button button-secondary" type="button" style={{ width: "100%" }} onClick={() => setEscalationDialogOpen(true)}>
-                    <Icon name="warning" size={16} /> Escalate complaint
-                  </button>
-                ) : (
-                  <div style={{ display: "grid", gap: "8px", background: "var(--background)", padding: "12px", borderRadius: "8px" }}>
-                    <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text)" }}>
-                      Escalation reason:
-                      <textarea
-                        style={{ width: "100%", marginTop: "4px", padding: "6px 8px", borderRadius: "6px", border: "1px solid var(--border)", fontSize: "12px" }}
-                        rows={3}
-                        placeholder="Provide justification..."
-                        value={escalationReason}
-                        onChange={(e) => setEscalationReason(e.target.value)}
-                      />
-                    </label>
-                    <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-                      <button className="button button-secondary button-small" type="button" onClick={() => { setEscalationDialogOpen(false); setEscalationReason(""); }} disabled={escalating}>
-                        Cancel
-                      </button>
-                      <button className="button button-primary button-small" type="button" onClick={commitEscalation} disabled={escalating || !escalationReason.trim()}>
-                        {escalating ? "Saving..." : "Escalate"}
-                      </button>
+          {/* Ticket Inspector Grid */}
+          <div className="ticket-detail-grid">
+            {/* Left Column: Details & Audit Timeline */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+              {/* Grievance Description Card */}
+              <div
+                style={{
+                  background: "var(--bg-surface)",
+                  border: "1px solid var(--border-subtle)",
+                  borderRadius: "var(--radius-lg)",
+                  padding: "24px",
+                }}
+              >
+                <h3 style={{ fontSize: "1.05rem", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <FileText size={18} style={{ color: "var(--accent-blue)" }} />
+                  Grievance Description & Impact
+                </h3>
+                <p style={{ fontSize: "0.94rem", color: "var(--text-primary)", whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
+                  {complaint.description}
+                </p>
+
+                {/* Escalation Alert Box if active */}
+                {complaint.escalated && (
+                  <div
+                    style={{
+                      background: "rgba(244, 63, 94, 0.1)",
+                      border: "1px solid rgba(244, 63, 94, 0.35)",
+                      borderRadius: "var(--radius-md)",
+                      padding: "16px",
+                      marginTop: "20px",
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "12px",
+                    }}
+                  >
+                    <ShieldAlert size={20} style={{ color: "var(--accent-rose)", flexShrink: 0 }} />
+                    <div>
+                      <strong style={{ fontSize: "0.9rem", color: "#FDA4AF", display: "block" }}>
+                        Escalated Priority: Level {complaint.escalationLevel}
+                      </strong>
+                      <p style={{ fontSize: "0.84rem", color: "var(--text-secondary)", marginTop: "4px" }}>
+                        <strong>Reason:</strong> {complaint.escalationReason || "High priority business escalation"}
+                      </p>
+                      {complaint.escalatedAt && (
+                        <small style={{ color: "var(--text-muted)", display: "block", marginTop: "4px" }}>
+                          Escalated {formatRelativeTime(complaint.escalatedAt)}
+                        </small>
+                      )}
                     </div>
                   </div>
                 )}
               </div>
-            )}
-          </section>
-          <section className="surface detail-section">
-            <div className="section-heading"><div><p className="eyebrow">WORK ALLOCATION</p><h2>Assignment</h2></div></div>
-            {assignment ? <dl className="compact-details">
-              <div><dt>Assigned to</dt><dd>{assignment.assignedTo}</dd></div>
-              <div><dt>Assignment status</dt><dd><StatusBadge status={assignment.status} /></dd></div>
-              <div><dt>Updated</dt><dd>{formatDateTime(assignment.updatedAt)}</dd></div>
-            </dl> : <p className="muted-note">No assignment is available for this complaint.</p>}
-            <button className="text-link side-link" type="button" onClick={() => navigate("/assignments")}>Open assignments <span aria-hidden="true">→</span></button>
-          </section>
-        </aside>
-      </div>
-    </>}
-    <ConfirmDialog open={Boolean(nextStatus)} title={`Move complaint to ${nextStatus?.replaceAll("_", " ").toLowerCase()}?`}
-      message="This updates the complaint lifecycle and records the change in its history." confirmLabel="Confirm status change"
-      tone={nextStatus === "CLOSED" ? "danger" : "primary"} isBusy={updating} onConfirm={commitStatus} onCancel={() => setNextStatus(null)} />
-  </AppShell>;
+
+              {/* Real-Time Audit History Timeline */}
+              <div
+                style={{
+                  background: "var(--bg-surface)",
+                  border: "1px solid var(--border-subtle)",
+                  borderRadius: "var(--radius-lg)",
+                  padding: "24px",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <h3 style={{ fontSize: "1.05rem", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <History size={18} style={{ color: "var(--accent-indigo)" }} />
+                    Audit Trail & Transition Lifecycle
+                  </h3>
+                  <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                    {orderedHistory.length} audit event(s)
+                  </span>
+                </div>
+
+                {orderedHistory.length === 0 ? (
+                  <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginTop: "16px" }}>
+                    No audit records logged yet.
+                  </p>
+                ) : (
+                  <div className="ticket-timeline">
+                    {orderedHistory.map((item, idx) => (
+                      <div className="timeline-item" key={item.id || idx}>
+                        <div className="timeline-dot" />
+                        <div className="timeline-header">
+                          <strong>
+                            {item.fromStatus ? `${item.fromStatus} → ${item.toStatus}` : item.toStatus}
+                          </strong>
+                          <time>{formatDateTime(item.changedAt)}</time>
+                        </div>
+                        <p style={{ fontSize: "0.84rem" }}>
+                          {item.actionNote || "Status updated."}
+                        </p>
+                        <small style={{ fontSize: "0.74rem", color: "var(--text-muted)" }}>
+                          By: <strong style={{ color: "var(--text-secondary)" }}>{item.changedByUsername}</strong>
+                        </small>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right Column: Assignment, SLA, and Actions */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+              {/* Department Assignment Card */}
+              <div
+                style={{
+                  background: "var(--bg-surface)",
+                  border: "1px solid var(--border-subtle)",
+                  borderRadius: "var(--radius-lg)",
+                  padding: "22px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "14px",
+                }}
+              >
+                <h4 style={{ fontSize: "0.95rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  Department Assignment
+                </h4>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <div
+                    style={{
+                      width: "42px",
+                      height: "42px",
+                      borderRadius: "var(--radius-md)",
+                      background: "rgba(59, 130, 246, 0.12)",
+                      color: "var(--accent-blue)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Building2 size={22} />
+                  </div>
+                  <div>
+                    <strong style={{ fontSize: "1rem", display: "block" }}>
+                      {complaint.department}
+                    </strong>
+                    <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
+                      Assignee: <strong style={{ color: "var(--text-primary)" }}>{assignment?.assignedTo || "Auto-Dispatch"}</strong>
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: "12px", display: "flex", justifyContent: "space-between", fontSize: "0.82rem" }}>
+                  <span style={{ color: "var(--text-muted)" }}>Assignment Status:</span>
+                  <StatusBadge status={assignment?.status || "ASSIGNED"} />
+                </div>
+              </div>
+
+              {/* SLA Target Card */}
+              <div
+                style={{
+                  background: "var(--bg-surface)",
+                  border: "1px solid var(--border-subtle)",
+                  borderRadius: "var(--radius-lg)",
+                  padding: "22px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                }}
+              >
+                <h4 style={{ fontSize: "0.95rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  SLA Monitoring
+                </h4>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <Clock size={20} style={{ color: complaint.overdue ? "var(--accent-rose)" : "var(--accent-emerald)" }} />
+                  <div>
+                    <strong style={{ fontSize: "1.1rem", color: complaint.overdue ? "var(--accent-rose)" : "var(--text-primary)" }}>
+                      {complaint.overdue ? "SLA Breached" : "Within Target"}
+                    </strong>
+                    <span style={{ fontSize: "0.78rem", color: "var(--text-muted)", display: "block" }}>
+                      Deadline: {complaint.slaDeadline ? formatDateTime(complaint.slaDeadline) : "Standard"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Controls Card (Role-Aware) */}
+              <div
+                style={{
+                  background: "var(--bg-surface)",
+                  border: "1px solid var(--border-subtle)",
+                  borderRadius: "var(--radius-lg)",
+                  padding: "22px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "14px",
+                }}
+              >
+                <h4 style={{ fontSize: "0.95rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  Workflow Controls
+                </h4>
+
+                {/* Staff / Admin Status Update Controls */}
+                {isStaff && allowedNext.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                    <label style={{ fontSize: "0.82rem", fontWeight: 600 }}>Advance Lifecycle State:</label>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      {allowedNext.map((nextSt) => (
+                        <button
+                          key={nextSt}
+                          className="btn btn-secondary"
+                          style={{ width: "100%", justifyContent: "space-between" }}
+                          type="button"
+                          disabled={updatingStatus}
+                          onClick={() => handleUpdateStatus(nextSt)}
+                        >
+                          <span>{actionLabels[nextSt] || nextSt}</span>
+                          <ArrowRight size={14} />
+                        </button>
+                      ))}
+                    </div>
+
+                    <input
+                      className="form-control"
+                      style={{ fontSize: "0.82rem", marginTop: "4px" }}
+                      placeholder="Optional transition note..."
+                      value={statusNote}
+                      onChange={(e) => setStatusNote(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                {/* Customer Close Action when RESOLVED */}
+                {canClose && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    <p style={{ fontSize: "0.84rem", color: "var(--accent-emerald)" }}>
+                      Your issue has been marked resolved. Please confirm closure.
+                    </p>
+                    <button
+                      className="btn btn-primary"
+                      type="button"
+                      disabled={updatingStatus}
+                      onClick={() => handleUpdateStatus("CLOSED")}
+                      style={{ background: "linear-gradient(135deg, #10B981, #059669)" }}
+                    >
+                      <CheckCircle2 size={16} /> Confirm & Close Grievance
+                    </button>
+                  </div>
+                )}
+
+                {/* Customer Escalation Button */}
+                {currentStatus !== "CLOSED" && currentStatus !== "RESOLVED" && (
+                  <button
+                    className="btn btn-danger"
+                    type="button"
+                    onClick={() => setEscalationModalOpen(true)}
+                  >
+                    <ShieldAlert size={16} />
+                    <span>{complaint.escalated ? "Re-Escalate Issue" : "Escalate Grievance"}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Escalation Modal */}
+          {escalationModalOpen && (
+            <div className="modal-backdrop" onClick={() => setEscalationModalOpen(false)}>
+              <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                  <div>
+                    <span style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.08em", color: "var(--accent-rose)", textTransform: "uppercase" }}>
+                      URGENT ESCALATION
+                    </span>
+                    <h2 style={{ fontSize: "1.3rem", marginTop: "2px" }}>Escalate Grievance #{id}</h2>
+                  </div>
+                  <button className="icon-button" type="button" onClick={() => setEscalationModalOpen(false)}>
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <form onSubmit={handleEscalate}>
+                  <div className="modal-body">
+                    <p style={{ fontSize: "0.86rem", color: "var(--text-secondary)" }}>
+                      Escalating notifies the department head and accelerates SLA priority for immediate intervention.
+                    </p>
+
+                    <div className="form-group">
+                      <label>Select Escalation Severity Level</label>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px" }}>
+                        {[1, 2, 3].map((lvl) => (
+                          <div
+                            key={lvl}
+                            style={{
+                              background: escalationLevel === lvl ? "rgba(244, 63, 94, 0.15)" : "var(--bg-app)",
+                              border: escalationLevel === lvl ? "1px solid var(--accent-rose)" : "1px solid var(--border-subtle)",
+                              borderRadius: "var(--radius-md)",
+                              padding: "10px",
+                              textAlign: "center",
+                              cursor: "pointer",
+                            }}
+                            onClick={() => setEscalationLevel(lvl)}
+                          >
+                            <strong style={{ color: escalationLevel === lvl ? "#FB7185" : "var(--text-primary)", display: "block" }}>
+                              Level {lvl}
+                            </strong>
+                            <small style={{ fontSize: "0.68rem", color: "var(--text-muted)" }}>
+                              {lvl === 1 ? "Supervisor" : lvl === 2 ? "Dept Lead" : "Executive"}
+                            </small>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="esc-reason">Business Justification & Urgency</label>
+                      <textarea
+                        id="esc-reason"
+                        className="form-control"
+                        placeholder="Detail why standard SLA resolution is insufficient and what immediate action is needed..."
+                        value={escalationReason}
+                        onChange={(e) => setEscalationReason(e.target.value)}
+                        rows={4}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="modal-footer">
+                    <button
+                      className="btn btn-secondary"
+                      type="button"
+                      onClick={() => setEscalationModalOpen(false)}
+                      disabled={escalating}
+                    >
+                      Cancel
+                    </button>
+                    <button className="btn btn-danger" type="submit" disabled={escalating}>
+                      {escalating ? "Submitting Escalation..." : "Confirm Escalation"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </AppShell>
+  );
 }
 
 export default ComplaintDetails;
