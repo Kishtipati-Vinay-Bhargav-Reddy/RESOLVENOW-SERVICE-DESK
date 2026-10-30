@@ -1180,27 +1180,7 @@ textarea.form-control {
   gap: 24px;
 }
 
-.quick-demo-accounts {
-  background: var(--bg-surface-elevated);
-  border: 1px dashed var(--border-medium);
-  border-radius: var(--radius-md);
-  padding: 14px;
-}
 
-.quick-demo-accounts p {
-  font-size: 0.74rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-  margin-bottom: 8px;
-}
-
-.quick-demo-buttons {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
 
 /* ==========================================================================
    Responsive Adaptations
@@ -1497,14 +1477,14 @@ textarea.form-control {
   line-height: 1.6;
 }
 
-/* Demo Section */
-.demo-cards-grid {
+/* Solutions Grid */
+.solutions-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 20px;
 }
 
-.demo-profile-card {
+.solution-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -1515,54 +1495,9 @@ textarea.form-control {
   transition: transform 0.2s ease, border-color 0.2s ease;
 }
 
-.demo-profile-card:hover {
+.solution-card:hover {
   transform: translateY(-4px);
   border-color: rgba(56, 189, 248, 0.4);
-}
-
-.featured-demo-card {
-  border-color: rgba(56, 189, 248, 0.5);
-  box-shadow: 0 0 24px rgba(2, 132, 199, 0.15);
-}
-
-.demo-card-badge {
-  font-size: 0.68rem;
-  font-weight: 700;
-  padding: 4px 8px;
-  border-radius: 4px;
-  align-self: flex-start;
-  margin-bottom: 14px;
-}
-
-.demo-profile-card h3 {
-  font-size: 1.4rem;
-  font-weight: 700;
-  margin-bottom: 4px;
-  color: #FFFFFF;
-}
-
-.demo-email {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  margin-bottom: 16px;
-}
-
-.demo-features {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 24px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex: 1;
-}
-
-.demo-features li {
-  font-size: 0.82rem;
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 /* Services Grid */
@@ -1577,7 +1512,7 @@ textarea.form-control {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  padding: 20px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1589,81 +1524,13 @@ textarea.form-control {
   justify-content: space-between;
 }
 
-.status-pill-online {
-  background: rgba(16, 185, 129, 0.12);
-  color: #34D399;
-  border: 1px solid rgba(16, 185, 129, 0.3);
-  font-size: 0.72rem;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: var(--radius-full);
-}
-
 .service-role {
-  font-size: 0.86rem;
+  font-size: 0.88rem;
   color: var(--text-secondary);
-  line-height: 1.5;
+  line-height: 1.6;
   margin: 0;
 }
 
-.service-tech {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.74rem;
-  color: var(--text-muted);
-  border-top: 1px solid var(--border-subtle);
-  padding-top: 10px;
-}
-
-/* Diagram */
-.architecture-diagram-card {
-  background: rgba(17, 24, 39, 0.6);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  padding: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.diagram-step {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 16px 20px;
-  text-align: center;
-  min-width: 170px;
-}
-
-.highlight-step {
-  border-color: rgba(56, 189, 248, 0.4);
-  background: rgba(56, 189, 248, 0.05);
-}
-
-.diagram-icon {
-  margin-bottom: 8px;
-  color: #38BDF8;
-}
-
-.diagram-step strong {
-  display: block;
-  font-size: 0.92rem;
-  color: var(--text-primary);
-}
-
-.diagram-step span {
-  display: block;
-  font-size: 0.74rem;
-  color: var(--text-muted);
-  margin-top: 2px;
-}
-
-.diagram-arrow {
-  color: var(--text-muted);
-}
 
 /* Workflows Timeline */
 .workflows-timeline {
@@ -1850,7 +1717,7 @@ textarea.form-control {
 /* Responsive */
 @media (max-width: 1024px) {
   .home-hero-title { font-size: 2.8rem; }
-  .demo-cards-grid, .sla-cards-grid, .workflows-timeline { grid-template-columns: repeat(2, 1fr); }
+  .solutions-grid, .sla-cards-grid, .workflows-timeline { grid-template-columns: repeat(2, 1fr); }
   .services-grid { grid-template-columns: repeat(2, 1fr); }
   .home-stats-grid { grid-template-columns: repeat(2, 1fr); }
   .home-footer-inner { grid-template-columns: 1fr 1fr; }
@@ -1859,7 +1726,7 @@ textarea.form-control {
 @media (max-width: 768px) {
   .home-hero-title { font-size: 2.2rem; }
   .home-nav-links { display: none; }
-  .demo-cards-grid, .sla-cards-grid, .workflows-timeline, .services-grid, .home-stats-grid { grid-template-columns: 1fr; }
+  .solutions-grid, .sla-cards-grid, .workflows-timeline, .services-grid, .home-stats-grid { grid-template-columns: 1fr; }
   .home-footer-inner { grid-template-columns: 1fr; }
   .home-footer-bottom { flex-direction: column; text-align: center; }
 }

@@ -3,14 +3,16 @@ import {
   ShieldCheck, 
   RotateCw, 
   LogOut, 
-  Sparkles,
-  Server,
-  CheckCircle2
+  User, 
+  Mail, 
+  CheckCircle2, 
+  Bell, 
+  Shield
 } from "lucide-react";
 import AppShell from "../components/AppShell";
 import { ErrorState, LoadingSkeleton, PageHeader } from "../components/Feedback";
 import { useToast } from "../components/ToastContext";
-import { api, getAuthMe, getErrorMessage, persistSession } from "../services/api";
+import { getAuthMe, getErrorMessage } from "../services/api";
 
 function Profile({ username, onLogout }) {
   const showToast = useToast();
@@ -18,7 +20,11 @@ function Profile({ username, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
-  const [switchingRole, setSwitchingRole] = useState(false);
+
+  // Notification Preferences (Client-side toggles)
+  const [emailAlerts, setEmailAlerts] = useState(true);
+  const [inAppAlerts, setInAppAlerts] = useState(true);
+  const [slaAlerts, setSlaAlerts] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -41,27 +47,9 @@ function Profile({ username, onLogout }) {
     setRefreshKey((v) => v + 1);
   };
 
-  const handleQuickSwitch = async (targetUsername, targetPassword) => {
-    setSwitchingRole(true);
-    try {
-      const { data: authResponse } = await api.post("/auth/login", {
-        username: targetUsername,
-        password: targetPassword,
-      });
-
-      const token = typeof authResponse === "string" ? authResponse : authResponse?.token;
-      persistSession(token, { username: targetUsername });
-
-      const profileRes = await api.get("/auth/me");
-      persistSession(token, profileRes.data);
-      setProfile(profileRes.data);
-      showToast(`Switched identity to ${targetUsername} (${profileRes.data.role}).`);
-      window.location.reload();
-    } catch (err) {
-      showToast(`Role switch failed: ${getErrorMessage(err)}`, "error");
-    } finally {
-      setSwitchingRole(false);
-    }
+  const handleSavePreferences = (e) => {
+    e.preventDefault();
+    showToast("Notification preferences updated successfully.");
   };
 
   const normalizedRole = String(profile?.role || "USER").toUpperCase();
@@ -74,9 +62,9 @@ function Profile({ username, onLogout }) {
       onLogout={onLogout}
     >
       <PageHeader
-        eyebrow="USER IDENTITY / AUTHORIZATION"
-        title="Account & Security Profile"
-        description="Verified JWT credentials, role permissions, and session access control details."
+        eyebrow="USER ACCOUNT"
+        title="Profile & Security Settings"
+        description="Manage your account profile, role permissions, and notification preferences."
         actions={
           <div style={{ display: "flex", gap: "10px" }}>
             <button className="btn btn-secondary" type="button" onClick={refresh} disabled={loading}>
@@ -142,16 +130,16 @@ function Profile({ username, onLogout }) {
                         : "role-badge-user"
                     }`}
                   >
-                    {normalizedRole}
+                    {normalizedRole === "ADMIN" ? "Administrator" : normalizedRole === "STAFF" ? "Support Agent" : "Employee"}
                   </span>
                 </div>
                 <p style={{ fontSize: "0.88rem", color: "var(--text-secondary)", marginTop: "4px" }}>
-                  {profile.email || "No email on record"}
+                  {profile.email || "No corporate email on record"}
                 </p>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "8px" }}>
-                  <div className="status-dot" />
+                  <div className="status-dot status-dot-live" />
                   <span style={{ fontSize: "0.74rem", color: "var(--accent-emerald)", fontWeight: 600 }}>
-                    Active Session • JWT Authenticated
+                    Active Workspace Account
                   </span>
                 </div>
               </div>
@@ -167,83 +155,51 @@ function Profile({ username, onLogout }) {
               }}
             >
               <h3 style={{ fontSize: "1rem", marginBottom: "16px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                Identity Attributes
+                Account Information
               </h3>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px" }}>
                 <div style={{ background: "var(--bg-app)", padding: "14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)" }}>
-                  <span style={{ fontSize: "0.74rem", color: "var(--text-muted)", display: "block" }}>User Identifier</span>
-                  <strong style={{ fontSize: "1rem", color: "var(--text-primary)" }}>#{profile.userId}</strong>
+                  <span style={{ fontSize: "0.74rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "4px" }}>
+                    <User size={12} /> Username
+                  </span>
+                  <strong style={{ fontSize: "0.95rem", color: "var(--text-primary)", marginTop: "2px", display: "block" }}>
+                    {profile.username}
+                  </strong>
                 </div>
 
                 <div style={{ background: "var(--bg-app)", padding: "14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)" }}>
-                  <span style={{ fontSize: "0.74rem", color: "var(--text-muted)", display: "block" }}>Granted Authority</span>
-                  <strong style={{ fontSize: "1rem", color: "var(--accent-blue)" }}>ROLE_{normalizedRole}</strong>
+                  <span style={{ fontSize: "0.74rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "4px" }}>
+                    <Mail size={12} /> Corporate Email
+                  </span>
+                  <strong style={{ fontSize: "0.95rem", color: "var(--text-primary)", marginTop: "2px", display: "block" }}>
+                    {profile.email || "N/A"}
+                  </strong>
                 </div>
 
                 <div style={{ background: "var(--bg-app)", padding: "14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)" }}>
-                  <span style={{ fontSize: "0.74rem", color: "var(--text-muted)", display: "block" }}>Database Table</span>
-                  <strong style={{ fontSize: "0.9rem", color: "var(--text-primary)" }}>resolvenow_db.users</strong>
+                  <span style={{ fontSize: "0.74rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "4px" }}>
+                    <Shield size={12} /> Role Designation
+                  </span>
+                  <strong style={{ fontSize: "0.95rem", color: "var(--accent-blue)", marginTop: "2px", display: "block" }}>
+                    {normalizedRole}
+                  </strong>
                 </div>
 
                 <div style={{ background: "var(--bg-app)", padding: "14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)" }}>
-                  <span style={{ fontSize: "0.74rem", color: "var(--text-muted)", display: "block" }}>Ingress Gateway</span>
-                  <strong style={{ fontSize: "0.9rem", color: "var(--accent-emerald)" }}>Port 8080 (Active)</strong>
+                  <span style={{ fontSize: "0.74rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "4px" }}>
+                    <CheckCircle2 size={12} /> Account Status
+                  </span>
+                  <strong style={{ fontSize: "0.95rem", color: "var(--accent-emerald)", marginTop: "2px", display: "block" }}>
+                    Verified &amp; Active
+                  </strong>
                 </div>
-              </div>
-            </div>
-
-            {/* Quick Role Switcher for Hackathon Demonstrations */}
-            <div
-              style={{
-                background: "linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.08))",
-                border: "1px solid rgba(139, 92, 246, 0.3)",
-                borderRadius: "var(--radius-lg)",
-                padding: "24px",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-                <Sparkles size={18} style={{ color: "var(--accent-purple)" }} />
-                <h3 style={{ fontSize: "1.05rem", fontWeight: 700 }}>
-                  Live Evaluator Role Switcher
-                </h3>
-              </div>
-              <p style={{ fontSize: "0.84rem", color: "var(--text-secondary)", marginBottom: "16px" }}>
-                Instantly switch roles to demonstrate RBAC and interface adaptivity for hackathon judges:
-              </p>
-
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px" }}>
-                <button
-                  className="btn btn-secondary btn-small"
-                  type="button"
-                  disabled={switchingRole || (profile.username === "hackathon_test_user")}
-                  onClick={() => handleQuickSwitch("hackathon_test_user", "password12345")}
-                >
-                  Switch to User
-                </button>
-
-                <button
-                  className="btn btn-secondary btn-small"
-                  type="button"
-                  disabled={switchingRole || (profile.username === "staff_demo")}
-                  onClick={() => handleQuickSwitch("staff_demo", "password12345")}
-                >
-                  Switch to Staff
-                </button>
-
-                <button
-                  className="btn btn-secondary btn-small"
-                  type="button"
-                  disabled={switchingRole || (profile.username === "admin_demo")}
-                  onClick={() => handleQuickSwitch("admin_demo", "password12345")}
-                >
-                  Switch to Admin
-                </button>
               </div>
             </div>
           </div>
 
-          {/* Right Column: Security Architecture */}
+          {/* Right Column: Security & Notifications */}
           <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+            {/* Security Standards Card */}
             <div
               style={{
                 background: "var(--bg-surface)",
@@ -257,39 +213,37 @@ function Profile({ username, onLogout }) {
             >
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 <ShieldCheck size={20} style={{ color: "var(--accent-emerald)" }} />
-                <h3 style={{ fontSize: "1.05rem" }}>Security Standards & Token Telemetry</h3>
+                <h3 style={{ fontSize: "1.05rem" }}>Security &amp; Authentication</h3>
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "12px", fontSize: "0.84rem" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid var(--border-subtle)", paddingBottom: "8px" }}>
-                  <span style={{ color: "var(--text-muted)" }}>Token Architecture:</span>
-                  <strong style={{ color: "var(--text-primary)" }}>HMAC-SHA256 (JJWT 0.12.6)</strong>
+                  <span style={{ color: "var(--text-muted)" }}>Session Protocol:</span>
+                  <strong style={{ color: "var(--text-primary)" }}>Encrypted Token Authentication</strong>
                 </div>
 
                 <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid var(--border-subtle)", paddingBottom: "8px" }}>
-                  <span style={{ color: "var(--text-muted)" }}>Password Encryption:</span>
-                  <strong style={{ color: "var(--text-primary)" }}>BCrypt Adaptive Hashing</strong>
+                  <span style={{ color: "var(--text-muted)" }}>Password Security:</span>
+                  <strong style={{ color: "var(--text-primary)" }}>BCrypt One-Way Cryptographic Hash</strong>
                 </div>
 
                 <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid var(--border-subtle)", paddingBottom: "8px" }}>
-                  <span style={{ color: "var(--text-muted)" }}>Session Persistence:</span>
-                  <strong style={{ color: "var(--accent-emerald)" }}>Stateless REST Bearer Token</strong>
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid var(--border-subtle)", paddingBottom: "8px" }}>
-                  <span style={{ color: "var(--text-muted)" }}>Service Communication:</span>
-                  <strong style={{ color: "var(--accent-indigo)" }}>Internal Service Secret Header</strong>
+                  <span style={{ color: "var(--text-muted)" }}>Session State:</span>
+                  <strong style={{ color: "var(--accent-emerald)" }}>Active Session</strong>
                 </div>
 
                 <div style={{ display: "flex", justifyContent: "space-between", paddingBottom: "4px" }}>
-                  <span style={{ color: "var(--text-muted)" }}>Token Expiration:</span>
-                  <strong style={{ color: "var(--text-primary)" }}>24 Hours (86,400,000 ms)</strong>
+                  <span style={{ color: "var(--text-muted)" }}>Access Scope:</span>
+                  <strong style={{ color: "var(--text-primary)" }}>
+                    {normalizedRole === "ADMIN" ? "Global System Operations" : normalizedRole === "STAFF" ? "Departmental Queues" : "Employee Portal"}
+                  </strong>
                 </div>
               </div>
             </div>
 
-            {/* Cloud Microservices Architecture Card */}
-            <div
+            {/* Notification Preferences Card */}
+            <form
+              onSubmit={handleSavePreferences}
               style={{
                 background: "var(--bg-surface)",
                 border: "1px solid var(--border-subtle)",
@@ -297,33 +251,47 @@ function Profile({ username, onLogout }) {
                 padding: "24px",
                 display: "flex",
                 flexDirection: "column",
-                gap: "14px",
+                gap: "16px",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <Server size={18} style={{ color: "var(--accent-blue)" }} />
-                <h4 style={{ fontSize: "0.95rem" }}>Service Mesh Infrastructure</h4>
+                <Bell size={18} style={{ color: "var(--accent-blue)" }} />
+                <h4 style={{ fontSize: "0.95rem" }}>Notification Preferences</h4>
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <CheckCircle2 size={14} style={{ color: "var(--accent-emerald)" }} />
-                  <span>Eureka Service Discovery on port 8761</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <CheckCircle2 size={14} style={{ color: "var(--accent-emerald)" }} />
-                  <span>Spring Cloud Gateway MVC Routing on port 8080</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <CheckCircle2 size={14} style={{ color: "var(--accent-emerald)" }} />
-                  <span>Transactional Outbox Pattern for notification delivery</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <CheckCircle2 size={14} style={{ color: "var(--accent-emerald)" }} />
-                  <span>PostgreSQL 17 on port 5433 with schema isolation</span>
-                </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px", fontSize: "0.84rem" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={inAppAlerts}
+                    onChange={(e) => setInAppAlerts(e.target.checked)}
+                  />
+                  <span>In-App Real-Time Alerts for status changes</span>
+                </label>
+
+                <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={emailAlerts}
+                    onChange={(e) => setEmailAlerts(e.target.checked)}
+                  />
+                  <span>Email notifications on ticket assignment &amp; resolution</span>
+                </label>
+
+                <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={slaAlerts}
+                    onChange={(e) => setSlaAlerts(e.target.checked)}
+                  />
+                  <span>High-priority SLA deadline &amp; escalation warnings</span>
+                </label>
               </div>
-            </div>
+
+              <button type="submit" className="btn btn-secondary btn-small" style={{ alignSelf: "flex-start", marginTop: "4px" }}>
+                Save Preferences
+              </button>
+            </form>
           </div>
         </div>
       )}

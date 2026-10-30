@@ -87,12 +87,6 @@ function Login({ onLogin, initialMode = "login" }) {
     }
   };
 
-  const handleQuickDemoLogin = (demoUsername, demoPassword) => {
-    setUsername(demoUsername);
-    setPassword(demoPassword);
-    setError("");
-  };
-
   return (
     <main className="auth-page">
       {/* Left Column: Enterprise Hero Panel */}
@@ -102,18 +96,18 @@ function Login({ onLogin, initialMode = "login" }) {
           <div>
             <strong style={{ fontSize: "1.2rem", color: "var(--text-primary)" }}>ResolveNow</strong>
             <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", letterSpacing: "0.08em", display: "block" }}>
-              ENTERPRISE ISSUE ESCALATION SYSTEM
+              ENTERPRISE SERVICE DESK
             </span>
           </div>
         </div>
 
         <div className="auth-hero-copy">
           <span className="role-badge-header role-badge-admin">
-            <Sparkles size={12} /> Cloud-Native Microservices Architecture
+            <Sparkles size={12} /> Enterprise Service Platform
           </span>
           <h1>Mission-critical service desk management.</h1>
           <p style={{ fontSize: "1.05rem", color: "var(--text-secondary)", lineHeight: 1.6, maxWidth: "520px" }}>
-            Decoupled microservice platform built for automated grievance logging, transparent department dispatch, and strict SLA compliance.
+            Automated grievance intake, transparent department dispatch, and strict SLA compliance for fast-moving enterprise teams.
           </p>
 
           <div className="auth-features-list">
@@ -123,7 +117,7 @@ function Login({ onLogin, initialMode = "login" }) {
               </div>
               <div>
                 <strong>Intelligent Department Dispatch</strong>
-                <small>Auto-assignment across IT, HR, Finance, and Operations teams.</small>
+                <small>Auto-assignment across IT, HR, Finance, and Operations queues.</small>
               </div>
             </div>
 
@@ -133,7 +127,7 @@ function Login({ onLogin, initialMode = "login" }) {
               </div>
               <div>
                 <strong>Real-Time SLA & Escalation Engine</strong>
-                <small>Calculated SLA deadlines (4h to 72h) with multi-level ticket escalation.</small>
+                <small>Calculated SLA resolution deadlines (4h to 72h) with multi-level ticket escalation.</small>
               </div>
             </div>
 
@@ -142,16 +136,16 @@ function Login({ onLogin, initialMode = "login" }) {
                 <ShieldCheck size={18} />
               </div>
               <div>
-                <strong>JWT & RBAC Security Standard</strong>
-                <small>Strict role-based isolation for Employees, Support Agents, and Administrators.</small>
+                <strong>Role-Based Access Control</strong>
+                <small>Strict role isolation for Employees, Support Agents, and Administrators.</small>
               </div>
             </div>
           </div>
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.78rem", color: "var(--text-muted)", borderTop: "1px solid var(--border-subtle)", paddingTop: "18px" }}>
-          <span>Powered by Spring Boot 4 & Eureka Discovery</span>
-          <span>Port 8080 API Gateway</span>
+          <span>Enterprise Grade Security</span>
+          <span>99.9% High Availability</span>
         </div>
       </section>
 
@@ -172,55 +166,10 @@ function Login({ onLogin, initialMode = "login" }) {
             </h2>
             <p style={{ fontSize: "0.88rem", color: "var(--text-secondary)", marginTop: "4px" }}>
               {isLogin 
-                ? "Enter your credentials or use the 1-click test accounts below." 
+                ? "Enter your credentials to access your workspace." 
                 : "Create an employee or support staff account to get started."}
             </p>
           </div>
-
-          {/* Quick Demo Logins */}
-          {isLogin && (
-            <div className="quick-demo-accounts">
-              <p>Quick Test Accounts (1-Click Fill):</p>
-              <div className="quick-demo-buttons" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-small"
-                  onClick={() => handleQuickDemoLogin("user1", "Password@123")}
-                  title="Sign in as user1 (Employee)"
-                  style={{ justifyContent: "center" }}
-                >
-                  👤 user1 (User)
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-small"
-                  onClick={() => handleQuickDemoLogin("user2", "Password@123")}
-                  title="Sign in as user2 (Employee)"
-                  style={{ justifyContent: "center" }}
-                >
-                  👤 user2 (User)
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-small"
-                  onClick={() => handleQuickDemoLogin("staff1", "Password@123")}
-                  title="Sign in as staff1 (Support Staff)"
-                  style={{ justifyContent: "center" }}
-                >
-                  🛠️ staff1 (Staff)
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-small"
-                  onClick={() => handleQuickDemoLogin("admin_demo", "password12345")}
-                  title="Sign in as System Administrator"
-                  style={{ justifyContent: "center" }}
-                >
-                  🛡️ admin_demo
-                </button>
-              </div>
-            </div>
-          )}
 
           {success && (
             <div style={{ background: "rgba(16, 185, 129, 0.12)", border: "1px solid rgba(16, 185, 129, 0.3)", borderRadius: "var(--radius-md)", padding: "12px 16px", display: "flex", alignItems: "center", gap: "10px", color: "#34D399", fontSize: "0.85rem" }}>
@@ -277,7 +226,7 @@ function Login({ onLogin, initialMode = "login" }) {
 
             {!isLogin && (
               <div className="form-group">
-                <label>Account Role & Permissions</label>
+                <label>Account Role &amp; Permissions</label>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "4px" }}>
                   <button
                     type="button"
@@ -298,8 +247,8 @@ function Login({ onLogin, initialMode = "login" }) {
                 </div>
                 <small style={{ color: "var(--text-muted)", fontSize: "0.76rem", marginTop: "4px", display: "block" }}>
                   {role === "USER"
-                    ? "Allows lodging grievances, tracking issue status, and viewing SLA progress."
-                    : "Allows handling departmental ticket queues, reassigning, and updating statuses."}
+                    ? "Log customer grievances, track issue status, and view SLA countdowns."
+                    : "Manage departmental queues, reassign tickets, and advance ticket statuses."}
                 </small>
               </div>
             )}

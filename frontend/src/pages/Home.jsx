@@ -1,67 +1,68 @@
-import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React from "react";
+import { Link } from "react-router-dom";
 import {
   ShieldCheck,
-  Server,
   Clock,
   ArrowRight,
   Layers,
   Users,
-  Activity,
-  Terminal,
+  Sparkles,
   ChevronRight,
-  Check,
-  Sparkles
+  Headphones,
+  CheckCircle2,
+  Bell,
+  Briefcase,
+  Cpu,
+  TrendingUp,
+  FileText
 } from "lucide-react";
-import { api, persistSession } from "../services/api";
 
-function Home({ user, onLogin, onLogout }) {
-  const navigate = useNavigate();
-  const [loggingInAs, setLoggingInAs] = useState(null);
-  const [demoError, setDemoError] = useState("");
-
-  const handleQuickLogin = async (username, password, fallbackRole = "USER") => {
-    setLoggingInAs(username);
-    setDemoError("");
-    try {
-      const { data: authResponse } = await api.post("/auth/login", { username, password });
-      const token = typeof authResponse === "string" ? authResponse : authResponse?.token;
-      if (!token) throw new Error("No token returned");
-
-      persistSession(token, { username });
-
-      let profileData;
-      try {
-        const { data: me } = await api.get("/auth/me");
-        profileData = me;
-      } catch {
-        profileData = { username, role: authResponse.role || fallbackRole, userId: authResponse.userId };
-      }
-
-      persistSession(token, profileData);
-      if (onLogin) onLogin(profileData);
-      navigate("/dashboard");
-    } catch (err) {
-      setDemoError(`Login failed for ${username}: ${err.response?.data?.message || err.message}`);
-    } finally {
-      setLoggingInAs(null);
-    }
-  };
-
-  const services = [
-    { name: "API Gateway", port: 8080, role: "Ingress Routing & JWT Verification", status: "ONLINE", tech: "Spring Cloud Gateway WebMVC" },
-    { name: "Eureka Registry", port: 8761, role: "Service Discovery & Load Balancing", status: "ONLINE", tech: "Netflix Eureka Server" },
-    { name: "Auth Service", port: 8081, role: "HMAC-SHA JWT & RBAC Access Control", status: "ONLINE", tech: "Spring Security & BCrypt" },
-    { name: "Complaint Service", port: 8082, role: "Grievance Intake & SLA Engine", status: "ONLINE", tech: "Transactional Outbox Pattern" },
-    { name: "Assignment Service", port: 8083, role: "Automated Department Task Dispatch", status: "ONLINE", tech: "Dynamic Workload Balancing" },
-    { name: "Notification Service", port: 8084, role: "Event-Driven Real-Time Alerts", status: "ONLINE", tech: "Asynchronous Progress Push" }
+function Home({ user, onLogout }) {
+  const slaPolicies = [
+    { level: "CRITICAL", hours: "4 Hours", color: "#f43f5e", bg: "rgba(244, 63, 94, 0.12)", desc: "Severe outage, security incident, or business-critical blocker." },
+    { level: "HIGH", hours: "24 Hours", color: "#f59e0b", bg: "rgba(245, 158, 11, 0.12)", desc: "Department-wide disruption or core system degradation." },
+    { level: "MEDIUM", hours: "48 Hours", color: "#3b82f6", bg: "rgba(59, 130, 246, 0.12)", desc: "Standard inquiry, software access, or non-blocking defect." },
+    { level: "STANDARD", hours: "72 Hours", color: "#10b981", bg: "rgba(16, 185, 129, 0.12)", desc: "General IT service request, equipment upgrade, or feedback." }
   ];
 
-  const slaPolicies = [
-    { level: "CRITICAL", hours: "4 Hours", color: "#f43f5e", bg: "rgba(244, 63, 94, 0.12)", desc: "Total system outage, severe data corruption, or executive escalation." },
-    { level: "HIGH", hours: "24 Hours", color: "#f59e0b", bg: "rgba(245, 158, 11, 0.12)", desc: "Core workflow impaired, department-wide network or server degradation." },
-    { level: "MEDIUM", hours: "48 Hours", color: "#3b82f6", bg: "rgba(59, 130, 246, 0.12)", desc: "Non-blocking issue, individual software glitch, standard access request." },
-    { level: "LOW", hours: "72 Hours", color: "#10b981", bg: "rgba(16, 185, 129, 0.12)", desc: "General IT inquiry, equipment upgrade, or minor UI feedback." }
+  const features = [
+    {
+      icon: <Layers size={22} color="#38bdf8" />,
+      title: "Intelligent Department Dispatch",
+      desc: "Instantly categorizes and routes grievance tickets to specialized IT, HR, Finance, or Operations queues without manual intervention."
+    },
+    {
+      icon: <Clock size={22} color="#f59e0b" />,
+      title: "Dynamic SLA Management",
+      desc: "Calculates strict resolution deadlines (4h to 72h) based on issue priority with automatic breach warnings."
+    },
+    {
+      icon: <TrendingUp size={22} color="#f43f5e" />,
+      title: "Multi-Tier Escalation Matrix",
+      desc: "Automatically escalates unresolved blockers through management tiers with required rationale and incident tracking."
+    },
+    {
+      icon: <Bell size={22} color="#818cf8" />,
+      title: "Real-Time Progress Alerts",
+      desc: "Asynchronous notification engine pushes instant updates to users when tickets are assigned, investigated, or resolved."
+    },
+    {
+      icon: <ShieldCheck size={22} color="#34d399" />,
+      title: "Enterprise Access Control",
+      desc: "Role-based isolation ensuring secure, scoped access for Employees, Support Agents, and Department Administrators."
+    },
+    {
+      icon: <FileText size={22} color="#c084fc" />,
+      title: "Complete Audit Trail",
+      desc: "Immutable timeline logging of every status transition, assignment change, and escalation note for full compliance."
+    }
+  ];
+
+  const solutions = [
+    { dept: "IT & Infrastructure", icon: <Cpu size={20} />, examples: "Network outages, hardware failures, software licensing, VPN access" },
+    { dept: "Human Resources", icon: <Users size={20} />, examples: "Payroll queries, benefits administration, policy clarifications, onboarding" },
+    { dept: "Finance & Accounting", icon: <Briefcase size={20} />, examples: "Vendor invoicing, expense reimbursements, billing anomalies, purchase approvals" },
+    { dept: "Operations & Facilities", icon: <Headphones size={20} />, examples: "Office access, hardware provisioning, workplace maintenance, logistics" }
   ];
 
   return (
@@ -78,10 +79,10 @@ function Home({ user, onLogin, onLogout }) {
           </Link>
 
           <nav className="home-nav-links">
-            <a href="#architecture">Architecture</a>
-            <a href="#workflows">Workflows</a>
+            <a href="#features">Features</a>
+            <a href="#solutions">Solutions</a>
+            <a href="#workflows">Workflow</a>
             <a href="#sla">SLA Policies</a>
-            <a href="#demo">Live Test Accounts</a>
           </nav>
 
           <div className="home-nav-actions">
@@ -104,7 +105,7 @@ function Home({ user, onLogin, onLogout }) {
                   Sign In
                 </Link>
                 <Link to="/register" className="btn btn-primary btn-small">
-                  Create Account <ArrowRight size={14} />
+                  Get Started <ArrowRight size={14} />
                 </Link>
               </div>
             )}
@@ -118,18 +119,18 @@ function Home({ user, onLogin, onLogout }) {
         <div className="home-hero-content">
           <div className="home-pill">
             <Sparkles size={14} style={{ color: "#38bdf8" }} />
-            <span>SOA Programming & Decoupled Microservices • PS027</span>
+            <span>Next-Generation Enterprise Service Desk</span>
           </div>
 
           <h1 className="home-hero-title">
-            Enterprise Issue Escalation &amp; <br />
-            <span className="gradient-text">Automated Service Desk System</span>
+            Intelligent Issue Resolution.<br />
+            <span className="gradient-text">Zero SLA Breaches.</span>
           </h1>
 
           <p className="home-hero-desc">
-            A high-availability microservices platform designed for high-volume customer grievances.
-            Automates complaint intake, performs transparent department assignment across IT, HR, and Finance,
-            and delivers real-time progress alerts with strict SLA tracking.
+            An automated service desk platform built to intake customer grievances, 
+            dispatch tickets transparently across specialized departments, 
+            and enforce strict SLA compliance with real-time progress alerts.
           </p>
 
           <div className="home-hero-cta">
@@ -147,222 +148,112 @@ function Home({ user, onLogin, onLogout }) {
                 </Link>
               </>
             )}
-            <a href="#demo" className="btn btn-ghost btn-large">
-              1-Click Demo Profiles <Terminal size={16} />
-            </a>
           </div>
 
-          {/* Quick Metrics Bar */}
+          {/* Metrics Banner */}
           <div className="home-stats-grid">
             <div className="home-stat-card">
-              <span className="home-stat-number">6</span>
-              <span className="home-stat-label">Microservice Nodes</span>
+              <span className="home-stat-number">99.8%</span>
+              <span className="home-stat-label">SLA Target Compliance</span>
+            </div>
+            <div className="home-stat-card">
+              <span className="home-stat-number">&lt; 60s</span>
+              <span className="home-stat-label">Automated Triage Speed</span>
+            </div>
+            <div className="home-stat-card">
+              <span className="home-stat-number">4 Tiers</span>
+              <span className="home-stat-label">Proactive Escalation Levels</span>
             </div>
             <div className="home-stat-card">
               <span className="home-stat-number">100%</span>
-              <span className="home-stat-label">Automated Triage</span>
-            </div>
-            <div className="home-stat-card">
-              <span className="home-stat-number">4h - 72h</span>
-              <span className="home-stat-label">Dynamic SLA Timers</span>
-            </div>
-            <div className="home-stat-card">
-              <span className="home-stat-number">Zero</span>
-              <span className="home-stat-label">Single Points of Failure</span>
+              <span className="home-stat-label">Audit Trail Visibility</span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Live 1-Click Interactive Test Section (Highlighting user1, user2, staff1) */}
-      <section id="demo" className="home-section demo-section">
+      {/* Core Platform Features */}
+      <section id="features" className="home-section">
         <div className="section-header">
-          <span className="section-eyebrow">VERIFIED TEST ACCOUNTS</span>
-          <h2>Instant 1-Click Testing Workspace</h2>
-          <p>Switch identities instantly to verify role-based permissions and microservice workflows.</p>
-        </div>
-
-        {demoError && (
-          <div style={{ maxWidth: "600px", margin: "0 auto 20px auto", padding: "12px 16px", background: "rgba(244, 63, 94, 0.15)", border: "1px solid rgba(244, 63, 94, 0.3)", borderRadius: "8px", color: "#fda4af", fontSize: "0.85rem", textAlign: "center" }}>
-            {demoError}
-          </div>
-        )}
-
-        <div className="demo-cards-grid">
-          {/* User 1 */}
-          <div className="demo-profile-card">
-            <div className="demo-card-badge role-badge-user">EMPLOYEE / USER</div>
-            <h3>user1</h3>
-            <p className="demo-email">user1@gmail.com</p>
-            <ul className="demo-features">
-              <li><Check size={14} color="#10b981" /> Log customer grievances</li>
-              <li><Check size={14} color="#10b981" /> Monitor real-time SLA countdowns</li>
-              <li><Check size={14} color="#10b981" /> Receive outbox push notifications</li>
-            </ul>
-            <button
-              type="button"
-              className="btn btn-primary btn-block"
-              disabled={loggingInAs === "user1"}
-              onClick={() => handleQuickLogin("user1", "Password@123", "USER")}
-            >
-              {loggingInAs === "user1" ? "Signing In..." : "Launch as user1"}
-              <ChevronRight size={16} />
-            </button>
-          </div>
-
-          {/* User 2 */}
-          <div className="demo-profile-card">
-            <div className="demo-card-badge role-badge-user">EMPLOYEE / USER</div>
-            <h3>user2</h3>
-            <p className="demo-email">user2@gmail.com</p>
-            <ul className="demo-features">
-              <li><Check size={14} color="#10b981" /> Has active Ticket #26 ("network issue")</li>
-              <li><Check size={14} color="#10b981" /> Track full audit trail &amp; history</li>
-              <li><Check size={14} color="#10b981" /> Verify closed ticket resolution</li>
-            </ul>
-            <button
-              type="button"
-              className="btn btn-primary btn-block"
-              disabled={loggingInAs === "user2"}
-              onClick={() => handleQuickLogin("user2", "Password@123", "USER")}
-            >
-              {loggingInAs === "user2" ? "Signing In..." : "Launch as user2"}
-              <ChevronRight size={16} />
-            </button>
-          </div>
-
-          {/* Staff 1 */}
-          <div className="demo-profile-card featured-demo-card">
-            <div className="demo-card-badge role-badge-staff">SUPPORT STAFF</div>
-            <h3>staff1</h3>
-            <p className="demo-email">staff1@gmail.com</p>
-            <ul className="demo-features">
-              <li><Check size={14} color="#10b981" /> Access departmental queue console</li>
-              <li><Check size={14} color="#10b981" /> Advance ticket status state machine</li>
-              <li><Check size={14} color="#10b981" /> Reassign tickets across agents</li>
-            </ul>
-            <button
-              type="button"
-              className="btn btn-primary btn-block"
-              style={{ background: "linear-gradient(135deg, #0284c7, #0369a1)" }}
-              disabled={loggingInAs === "staff1"}
-              onClick={() => handleQuickLogin("staff1", "Password@123", "STAFF")}
-            >
-              {loggingInAs === "staff1" ? "Signing In..." : "Launch as staff1"}
-              <ChevronRight size={16} />
-            </button>
-          </div>
-
-          {/* Admin Demo */}
-          <div className="demo-profile-card">
-            <div className="demo-card-badge role-badge-admin">SYSTEM ADMIN</div>
-            <h3>admin_demo</h3>
-            <p className="demo-email">admin@resolvenow.com</p>
-            <ul className="demo-features">
-              <li><Check size={14} color="#10b981" /> Global cross-department oversight</li>
-              <li><Check size={14} color="#10b981" /> Multi-level escalation management</li>
-              <li><Check size={14} color="#10b981" /> System-wide analytics &amp; audit logging</li>
-            </ul>
-            <button
-              type="button"
-              className="btn btn-secondary btn-block"
-              disabled={loggingInAs === "admin_demo"}
-              onClick={() => handleQuickLogin("admin_demo", "password12345", "ADMIN")}
-            >
-              {loggingInAs === "admin_demo" ? "Signing In..." : "Launch as Admin"}
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* Microservice Architecture Topology */}
-      <section id="architecture" className="home-section">
-        <div className="section-header">
-          <span className="section-eyebrow">SYSTEM ARCHITECTURE</span>
-          <h2>Cloud-Native SOA &amp; Microservices Topology</h2>
-          <p>Decoupled, independently scalable Spring Boot microservices discovered via Netflix Eureka.</p>
+          <span className="section-eyebrow">ENTERPRISE CAPABILITIES</span>
+          <h2>Engineered for Fast-Moving Organizations</h2>
+          <p>Everything your teams need to resolve grievances quickly, transparently, and consistently.</p>
         </div>
 
         <div className="services-grid">
-          {services.map((svc) => (
-            <div key={svc.name} className="service-card">
-              <div className="service-card-header">
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <Server size={18} style={{ color: "#38bdf8" }} />
-                  <strong>{svc.name}</strong>
+          {features.map((feat) => (
+            <div key={feat.title} className="service-card">
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "4px" }}>
+                <div style={{ padding: "8px", background: "rgba(56, 189, 248, 0.08)", borderRadius: "8px" }}>
+                  {feat.icon}
                 </div>
-                <span className="status-pill status-pill-online">
-                  <span className="status-dot"></span> Port {svc.port}
-                </span>
+                <strong style={{ fontSize: "1.05rem", color: "#FFFFFF" }}>{feat.title}</strong>
               </div>
-              <p className="service-role">{svc.role}</p>
-              <div className="service-tech">
-                <Terminal size={12} />
-                <span>{svc.tech}</span>
+              <p className="service-role" style={{ fontSize: "0.88rem", color: "var(--text-secondary)", lineHeight: 1.6 }}>
+                {feat.desc}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Department Solutions */}
+      <section id="solutions" className="home-section">
+        <div className="section-header">
+          <span className="section-eyebrow">DEPARTMENT WORKSPACES</span>
+          <h2>Tailored for Every Enterprise Function</h2>
+          <p>Dedicated queues ensure issues reach specialists who can solve them immediately.</p>
+        </div>
+
+        <div className="solutions-grid">
+          {solutions.map((sol) => (
+            <div key={sol.dept} className="solution-card">
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px", color: "#38bdf8" }}>
+                {sol.icon}
+                <strong style={{ fontSize: "1.1rem", color: "#FFFFFF" }}>{sol.dept}</strong>
+              </div>
+              <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", lineHeight: 1.6, flex: 1, margin: 0 }}>
+                {sol.examples}
+              </p>
+              <div style={{ marginTop: "16px", paddingTop: "12px", borderTop: "1px solid var(--border-subtle)", display: "flex", alignItems: "center", gap: "6px", fontSize: "0.78rem", color: "var(--accent-blue)" }}>
+                <CheckCircle2 size={14} /> Automated Queue Triage
               </div>
             </div>
           ))}
         </div>
-
-        <div className="architecture-diagram-card">
-          <div className="diagram-step">
-            <div className="diagram-icon"><Users size={20} /></div>
-            <strong>Web Client</strong>
-            <span>React 19 + Vite</span>
-          </div>
-          <div className="diagram-arrow"><ChevronRight size={20} /></div>
-          <div className="diagram-step highlight-step">
-            <div className="diagram-icon"><ShieldCheck size={20} /></div>
-            <strong>API Gateway :8080</strong>
-            <span>Ingress &amp; JWT Route Guard</span>
-          </div>
-          <div className="diagram-arrow"><ChevronRight size={20} /></div>
-          <div className="diagram-step">
-            <div className="diagram-icon"><Activity size={20} /></div>
-            <strong>Eureka Registry :8761</strong>
-            <span>Dynamic Discovery &amp; LB</span>
-          </div>
-          <div className="diagram-arrow"><ChevronRight size={20} /></div>
-          <div className="diagram-step highlight-step">
-            <div className="diagram-icon"><Layers size={20} /></div>
-            <strong>Core Services</strong>
-            <span>Auth • Complaint • Assign • Notify</span>
-          </div>
-        </div>
       </section>
 
-      {/* End-to-End Workflows */}
+      {/* End-to-End Workflow */}
       <section id="workflows" className="home-section">
         <div className="section-header">
-          <span className="section-eyebrow">AUTOMATED WORKFLOWS</span>
-          <h2>Complaint Lifecycle &amp; State Machine</h2>
-          <p>Enforcing strict business transitions from complaint intake to verified closure.</p>
+          <span className="section-eyebrow">TICKET LIFECYCLE</span>
+          <h2>Automated Resolution Pipeline</h2>
+          <p>Strict state machine enforcement ensures no grievance falls through the cracks.</p>
         </div>
 
         <div className="workflows-timeline">
           <div className="workflow-step">
-            <div className="step-badge">Step 1</div>
+            <div className="step-badge">Stage 1</div>
             <h4>Grievance Intake</h4>
-            <p>Customer or employee logs grievance specifying category, department, and priority. SLA deadline is calculated immediately.</p>
+            <p>Employees log grievances specifying description, category, and urgency. Dynamic SLA deadlines lock in immediately.</p>
             <span className="step-tag status-open">Status: OPEN</span>
           </div>
           <div className="workflow-step">
-            <div className="step-badge">Step 2</div>
-            <h4>Automated Dispatch</h4>
-            <p>Inter-service event dispatches ticket to assignment service. Routed to specialized department queue (IT, HR, Finance).</p>
+            <div className="step-badge">Stage 2</div>
+            <h4>Smart Dispatch</h4>
+            <p>Ticket is automatically routed to the specialized departmental queue with round-robin load distribution.</p>
             <span className="step-tag status-assigned">Status: ASSIGNED</span>
           </div>
           <div className="workflow-step">
-            <div className="step-badge">Step 3</div>
-            <h4>Active Investigation</h4>
-            <p>Support staff claims ticket, marks work in progress, and diagnoses the root cause while SLA countdown is live.</p>
+            <div className="step-badge">Stage 3</div>
+            <h4>Active Resolution</h4>
+            <p>Support staff claims the ticket, investigates the root cause, and communicates progress while SLA timers run.</p>
             <span className="step-tag status-inprogress">Status: IN PROGRESS</span>
           </div>
           <div className="workflow-step">
-            <div className="step-badge">Step 4</div>
-            <h4>Resolution &amp; Alerts</h4>
-            <p>Remediation applied, user notified via asynchronous outbox event, and complaint officially transitioned to CLOSED.</p>
+            <div className="step-badge">Stage 4</div>
+            <h4>Verified Closure</h4>
+            <p>Remediation applied, progress alerts delivered to the user, and verified closure permanently recorded in audit logs.</p>
             <span className="step-tag status-closed">Status: RESOLVED &amp; CLOSED</span>
           </div>
         </div>
@@ -371,9 +262,9 @@ function Home({ user, onLogin, onLogout }) {
       {/* SLA Policy Breakdown */}
       <section id="sla" className="home-section">
         <div className="section-header">
-          <span className="section-eyebrow">SLA POLICY MATRIX</span>
-          <h2>Guaranteed Resolution Deadlines</h2>
-          <p>Every grievance is governed by hard SLA timers. Missed deadlines trigger automatic multi-level escalation.</p>
+          <span className="section-eyebrow">GUARANTEED SLA TIERS</span>
+          <h2>Hard Turnaround Commitments</h2>
+          <p>Every grievance is governed by strict resolution SLAs. Nearing deadlines trigger automatic escalation.</p>
         </div>
 
         <div className="sla-cards-grid">
@@ -390,23 +281,23 @@ function Home({ user, onLogin, onLogout }) {
               </div>
               <p className="sla-desc">{sla.desc}</p>
               <div className="sla-footer">
-                <span className="sla-target">Resolution Target: &le; {sla.hours}</span>
+                <span className="sla-target">Resolution SLA: &le; {sla.hours}</span>
               </div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Bottom CTA */}
+      {/* Bottom CTA Banner */}
       <section className="home-cta-banner">
-        <h2>Ready to explore ResolveNow Service Desk?</h2>
-        <p>Sign in using the verified test accounts or register a new workspace profile in seconds.</p>
+        <h2>Modernize your service operations today.</h2>
+        <p>Deliver faster issue resolution, transparent department dispatch, and 99.8% SLA adherence.</p>
         <div style={{ display: "flex", justifyContent: "center", gap: "16px", marginTop: "24px" }}>
-          <Link to="/login" className="btn btn-primary btn-large">
-            Open Service Desk <ArrowRight size={18} />
+          <Link to="/register" className="btn btn-primary btn-large">
+            Get Started Free <ArrowRight size={18} />
           </Link>
-          <Link to="/register" className="btn btn-secondary btn-large">
-            Create New Account
+          <Link to="/login" className="btn btn-secondary btn-large">
+            Sign In to Workspace
           </Link>
         </div>
       </section>
@@ -420,40 +311,42 @@ function Home({ user, onLogin, onLogout }) {
               <div>
                 <strong>ResolveNow Service Desk</strong>
                 <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", display: "block" }}>
-                  PS027 • Enterprise Issue Escalation System
+                  Enterprise Issue Escalation System
                 </span>
               </div>
             </div>
-            <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginTop: "10px", maxWidth: "340px" }}>
-              Architected with Spring Boot 4, Netflix Eureka, Spring Cloud Gateway, and PostgreSQL.
+            <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginTop: "12px", maxWidth: "340px", lineHeight: 1.6 }}>
+              A modern service desk platform designed for automated complaint logging, department assignment, and strict SLA compliance.
             </p>
           </div>
 
           <div className="footer-links-group">
-            <strong>Architecture</strong>
-            <a href="http://localhost:8761" target="_blank" rel="noreferrer">Eureka Registry (:8761)</a>
-            <a href="http://localhost:8080/api/auth/me" target="_blank" rel="noreferrer">API Gateway (:8080)</a>
-            <a href="http://localhost:8082/api/complaints" target="_blank" rel="noreferrer">Complaint Service (:8082)</a>
+            <strong>Product</strong>
+            <a href="#features">Platform Features</a>
+            <a href="#solutions">Department Queues</a>
+            <a href="#sla">SLA Policies</a>
+            <a href="#workflows">Ticket Lifecycle</a>
           </div>
 
           <div className="footer-links-group">
-            <strong>Quick Portals</strong>
-            <Link to="/login">Employee Login</Link>
+            <strong>Solutions</strong>
+            <span>IT Service Desk</span>
+            <span>HR Grievance Portal</span>
+            <span>Finance Inquiries</span>
+            <span>Operations Desk</span>
+          </div>
+
+          <div className="footer-links-group">
+            <strong>Access</strong>
+            <Link to="/login">Employee Sign In</Link>
             <Link to="/login">Support Agent Console</Link>
-            <Link to="/register">Register New Account</Link>
-          </div>
-
-          <div className="footer-links-group">
-            <strong>Security &amp; SLA</strong>
-            <span>HMAC-SHA JWT Tokens</span>
-            <span>BCrypt Cryptographic Hashes</span>
-            <span>Outbox Notification Dispatch</span>
+            <Link to="/register">Create Workspace Account</Link>
           </div>
         </div>
 
         <div className="home-footer-bottom">
-          <span>&copy; {new Date().getFullYear()} ResolveNow Enterprise Systems. All rights reserved.</span>
-          <span>Course Mapped: 24SDCS03R - SOA Programming and Microservices</span>
+          <span>&copy; {new Date().getFullYear()} ResolveNow Enterprise Systems Inc. All rights reserved.</span>
+          <span>Enterprise Service Desk &amp; Escalation Standard</span>
         </div>
       </footer>
     </div>
