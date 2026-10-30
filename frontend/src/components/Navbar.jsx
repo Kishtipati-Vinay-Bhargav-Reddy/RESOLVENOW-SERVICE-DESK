@@ -8,7 +8,8 @@ import {
   LogOut, 
   ShieldCheck, 
   Headphones, 
-  UserCheck 
+  UserCheck,
+  Home as HomeIcon 
 } from "lucide-react";
 import { useNotificationCount } from "./NotificationCountContext";
 
@@ -103,6 +104,15 @@ function Navbar({ username, role, onLogout, onMenuToggle, menuOpen, menuButtonRe
       </form>
 
       <div className="topbar-actions">
+        <Link
+          className="btn btn-ghost btn-small"
+          to="/"
+          title="Return to Public Landing Page"
+          style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "0.82rem" }}
+        >
+          <HomeIcon size={15} /> Home
+        </Link>
+
         <Link 
           className="icon-button" 
           to="/notifications" 

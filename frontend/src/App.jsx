@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { api, clearSession, getStoredUser, persistSession } from "./services/api";
 import { ToastProvider } from "./components/ToastProvider";
+import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
 import Complaints from "./pages/Complaints";
 import ComplaintDetails from "./pages/ComplaintDetails";
@@ -66,7 +67,7 @@ function AppRoutes() {
     setUser(null);
     setHasToken(false);
     showToast("You have signed out.");
-    navigate("/login");
+    navigate("/");
   };
 
   const handleLogin = (authenticatedUser) => {
@@ -81,17 +82,22 @@ function AppRoutes() {
       ? <Page username={user?.username || ""} user={user} onLogout={logout} />
       : <Navigate to="/login" replace />;
 
-  return <NotificationCountProvider key={hasToken ? "authenticated" : "anonymous"} enabled={hasToken}><Routes>
-    <Route path="/login" element={isLoadingSession ? <main className="state-panel">Checking your session...</main> : hasToken ? <Navigate to="/dashboard" replace /> : <Login onLogin={handleLogin} />} />
-    <Route path="/register" element={isLoadingSession ? <main className="state-panel">Checking your session...</main> : hasToken ? <Navigate to="/dashboard" replace /> : <Login initialMode="register" />} />
-    <Route path="/dashboard" element={protectedPage(Dashboard)} />
-    <Route path="/complaints" element={protectedPage(Complaints)} />
-    <Route path="/complaints/:id" element={protectedPage(ComplaintDetails)} />
-    <Route path="/assignments" element={protectedPage(Assignments)} />
-    <Route path="/notifications" element={protectedPage(Notifications)} />
-    <Route path="/profile" element={protectedPage(Profile)} />
-    <Route path="*" element={<Navigate to={isLoadingSession ? "/login" : hasToken ? "/dashboard" : "/login"} replace />} />
-  </Routes></NotificationCountProvider>;
+  return (
+    <NotificationCountProvider key={hasToken ? "authenticated" : "anonymous"} enabled={hasToken}>
+      <Routes>
+        <Route path="/" element={<Home user={user} onLogin={handleLogin} onLogout={logout} />} />
+        <Route path="/login" element={isLoadingSession ? <main className="state-panel">Checking session...</main> : hasToken ? <Navigate to="/dashboard" replace /> : <Login onLogin={handleLogin} />} />
+        <Route path="/register" element={isLoadingSession ? <main className="state-panel">Checking session...</main> : hasToken ? <Navigate to="/dashboard" replace /> : <Login initialMode="register" />} />
+        <Route path="/dashboard" element={protectedPage(Dashboard)} />
+        <Route path="/complaints" element={protectedPage(Complaints)} />
+        <Route path="/complaints/:id" element={protectedPage(ComplaintDetails)} />
+        <Route path="/assignments" element={protectedPage(Assignments)} />
+        <Route path="/notifications" element={protectedPage(Notifications)} />
+        <Route path="/profile" element={protectedPage(Profile)} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </NotificationCountProvider>
+  );
 }
 
 export default App;

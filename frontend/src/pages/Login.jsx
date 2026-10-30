@@ -158,48 +158,65 @@ function Login({ onLogin, initialMode = "login" }) {
       {/* Right Column: Glassmorphic Auth Form */}
       <section className="auth-form-panel">
         <div className="auth-card">
-          <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
             <span style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.08em", color: "var(--accent-blue)", textTransform: "uppercase" }}>
               {isLogin ? "WORKSPACE AUTHENTICATION" : "CREATE NEW ACCOUNT"}
             </span>
-            <h2 style={{ fontSize: "1.65rem", marginTop: "4px" }}>
+            <Link to="/" style={{ fontSize: "0.8rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "4px", textDecoration: "none" }}>
+              &larr; Back to Home
+            </Link>
+          </div>
+          <div>
+            <h2 style={{ fontSize: "1.65rem", marginTop: "2px" }}>
               {isLogin ? "Sign in to ResolveNow" : "Register your account"}
             </h2>
             <p style={{ fontSize: "0.88rem", color: "var(--text-secondary)", marginTop: "4px" }}>
               {isLogin 
-                ? "Enter your credentials or use the 1-click demo accounts below." 
-                : "Create an employee account to start logging service grievances."}
+                ? "Enter your credentials or use the 1-click test accounts below." 
+                : "Create an employee or support staff account to get started."}
             </p>
           </div>
 
-          {/* Quick Demo Logins for Hackathon Evaluators */}
+          {/* Quick Demo Logins */}
           {isLogin && (
             <div className="quick-demo-accounts">
-              <p>Demo Profiles (1-Click Fill):</p>
-              <div className="quick-demo-buttons">
+              <p>Quick Test Accounts (1-Click Fill):</p>
+              <div className="quick-demo-buttons" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                 <button
                   type="button"
                   className="btn btn-secondary btn-small"
-                  onClick={() => handleQuickDemoLogin("hackathon_test_user", "password12345")}
-                  title="Sign in as Employee"
+                  onClick={() => handleQuickDemoLogin("user1", "Password@123")}
+                  title="Sign in as user1 (Employee)"
+                  style={{ justifyContent: "center" }}
                 >
-                  👤 User
+                  👤 user1 (User)
                 </button>
                 <button
                   type="button"
                   className="btn btn-secondary btn-small"
-                  onClick={() => handleQuickDemoLogin("staff_demo", "password12345")}
-                  title="Sign in as Support Staff"
+                  onClick={() => handleQuickDemoLogin("user2", "Password@123")}
+                  title="Sign in as user2 (Employee)"
+                  style={{ justifyContent: "center" }}
                 >
-                  🛠️ Staff
+                  👤 user2 (User)
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-small"
+                  onClick={() => handleQuickDemoLogin("staff1", "Password@123")}
+                  title="Sign in as staff1 (Support Staff)"
+                  style={{ justifyContent: "center" }}
+                >
+                  🛠️ staff1 (Staff)
                 </button>
                 <button
                   type="button"
                   className="btn btn-secondary btn-small"
                   onClick={() => handleQuickDemoLogin("admin_demo", "password12345")}
                   title="Sign in as System Administrator"
+                  style={{ justifyContent: "center" }}
                 >
-                  🛡️ Admin
+                  🛡️ admin_demo
                 </button>
               </div>
             </div>
