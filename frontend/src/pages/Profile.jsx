@@ -1,63 +1,67 @@
-import { useNavigate } from "react-router-dom";
-import Navbar from "../components/Navbar";
-import Sidebar from "../components/Sidebar";
+import { useEffect, useState } from "react";
+import AppShell from "../components/AppShell";
+import { ErrorState, LoadingSkeleton, PageHeader } from "../components/Feedback";
+import { useToast } from "../components/ToastContext";
+import { getAuthMe, getErrorMessage } from "../services/api";
 
 function Profile({ username, onLogout }) {
-  const navigate = useNavigate();
-  const storedUsername = localStorage.getItem("username") || username || "User";
+  const showToast = useToast();
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const handleNavigate = (item) => {
-    const routes = {
-      Dashboard: "/dashboard",
-      Complaints: "/complaints",
-      Assignments: "/assignments",
-      Notifications: "/notifications",
-    };
+  useEffect(() => {
+    let active = true;
+    getAuthMe()
+      .then(({ data }) => { if (active) setProfile(data); })
+      .catch((requestError) => { if (active) setError(getErrorMessage(requestError)); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [refreshKey]);
 
-    if (routes[item]) navigate(routes[item]);
+  const refresh = () => {
+    setLoading(true);
+    setError("");
+    setRefreshKey((value) => value + 1);
   };
 
-  return (
-    <div className="dashboard-shell">
-      <Navbar username={storedUsername} onLogout={onLogout} />
-      <div className="dashboard-body">
-        <Sidebar activeItem="Profile" onNavigate={handleNavigate} onLogout={onLogout} />
-        <main className="dashboard-main profile-page">
-          <div className="dashboard-heading">
-            <div>
-              <p className="eyebrow">SERVICE DESK / PROFILE</p>
-              <h1>Profile</h1>
-              <p className="page-description">Review your account and authentication details.</p>
-            </div>
-            <button className="outline-button" type="button" onClick={onLogout}>Logout</button>
-          </div>
+  const handleLogout = () => {
+    showToast("You have signed out.");
+    onLogout();
+  };
 
-          <div className="profile-grid">
-            <section className="surface profile-card">
-              <div className="section-heading"><div><p className="eyebrow">ACCOUNT</p><h2>Account Information</h2></div></div>
-              <div className="profile-details">
-                <div className="profile-detail"><span>Username</span><strong>{storedUsername}</strong></div>
-                <div className="profile-detail"><span>Role</span><strong>Service Desk User</strong></div>
-                <div className="profile-detail"><span>Authentication Status</span><strong className="detail-success">Authenticated</strong></div>
-                <div className="profile-detail"><span>Application</span><strong>ResolveNow Service Desk</strong></div>
-                <div className="profile-detail"><span>API Gateway</span><strong>http://localhost:8080</strong></div>
-              </div>
-            </section>
-
-            <section className="surface profile-card">
-              <div className="section-heading"><div><p className="eyebrow">ACCESS CONTROL</p><h2>Security</h2></div></div>
-              <div className="profile-details">
-                <div className="profile-detail"><span>JWT Authentication</span><strong className="detail-success">Enabled</strong></div>
-                <div className="profile-detail"><span>Session Type</span><strong>Stateless</strong></div>
-                <div className="profile-detail"><span>API Access</span><strong className="detail-success">Protected</strong></div>
-              </div>
-              <button className="primary-button profile-logout" type="button" onClick={onLogout}>Logout</button>
-            </section>
-          </div>
-        </main>
-      </div>
-    </div>
-  );
+  return <AppShell activeItem="Profile" username={profile?.username || username} role={profile?.role} onLogout={handleLogout}>
+    <PageHeader eyebrow="ACCOUNT / PROFILE" title="Your profile"
+      description="Account identity and access information for this service desk session."
+      actions={<button className="button button-secondary" type="button" onClick={refresh} disabled={loading}>{loading ? "Refreshing" : "Refresh"}</button>} />
+    {error && <ErrorState title="Unable to load your profile." detail={error} onRetry={refresh} />}
+    {loading ? <LoadingSkeleton rows={4} /> : profile && <div className="profile-layout">
+      <section className="surface profile-identity-card">
+        <div className="profile-avatar">{profile.username?.slice(0, 1).toUpperCase() || "U"}</div>
+        <div><p className="eyebrow">AUTHENTICATED ACCOUNT</p><h2>{profile.username}</h2><p>{profile.email || "No email on record"}</p></div>
+        <span className="session-status"><span />Session active</span>
+      </section>
+      <section className="surface profile-details-card">
+        <div className="section-heading"><div><p className="eyebrow">ACCOUNT DETAILS</p><h2>Identity</h2></div></div>
+        <dl className="profile-details">
+          <div className="profile-detail"><dt>Username</dt><dd>{profile.username}</dd></div>
+          <div className="profile-detail"><dt>Email</dt><dd>{profile.email || "Not provided"}</dd></div>
+          <div className="profile-detail"><dt>Role</dt><dd><span className="role-label">{profile.role || "User"}</span></dd></div>
+          <div className="profile-detail"><dt>User ID</dt><dd className="id-cell">#{profile.userId}</dd></div>
+        </dl>
+      </section>
+      <section className="surface profile-security-card">
+        <div className="section-heading"><div><p className="eyebrow">ACCESS CONTROL</p><h2>Security</h2></div></div>
+        <dl className="profile-details">
+          <div className="profile-detail"><dt>Authentication</dt><dd><span className="security-value">JWT protected</span></dd></div>
+          <div className="profile-detail"><dt>Session</dt><dd>Stateless</dd></div>
+          <div className="profile-detail"><dt>API access</dt><dd><span className="security-value">Authenticated</span></dd></div>
+        </dl>
+        <p className="security-note">Your access token and credentials are never displayed on this page.</p>
+      </section>
+    </div>}
+  </AppShell>;
 }
 
 export default Profile;

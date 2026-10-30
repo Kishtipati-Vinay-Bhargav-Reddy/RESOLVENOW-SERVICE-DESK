@@ -1,31 +1,35 @@
+import { NavLink } from "react-router-dom";
+import Icon from "./Icon";
+
 const navigation = [
-  ["Dashboard", "grid"],
-  ["Complaints", "inbox"],
-  ["Assignments", "assignment"],
-  ["Notifications", "bell"],
-  ["Profile", "user"],
+  ["Dashboard", "/dashboard", "dashboard"],
+  ["Complaints", "/complaints", "complaints"],
+  ["Assignments", "/assignments", "assignments"],
+  ["Notifications", "/notifications", "notifications"],
+  ["Profile", "/profile", "profile"],
 ];
 
-function Sidebar({ activeItem, onNavigate, onLogout }) {
+function Sidebar({ activeItem, onLogout, mobileOpen, onClose, sidebarRef }) {
   return (
-    <aside className="sidebar">
+    <aside ref={sidebarRef} className={`sidebar ${mobileOpen ? "sidebar-open" : ""}`} aria-label="Application navigation"
+      role={mobileOpen ? "dialog" : undefined} aria-modal={mobileOpen ? "true" : undefined}>
+      <div className="sidebar-heading"><span>WORKSPACE</span><button type="button" className="sidebar-close" aria-label="Close navigation" onClick={onClose}><Icon name="close" /></button></div>
       <nav aria-label="Primary navigation">
-        {navigation.map(([label, icon]) => (
-          <button
-            className={`nav-item ${activeItem === label ? "active" : ""}`}
-            key={label}
-            type="button"
-            onClick={() => onNavigate(label)}
-          >
-            <span className={`nav-icon ${icon}`} aria-hidden="true" />
-            {label}
-          </button>
+        {navigation.map(([label, path, icon]) => (
+          <NavLink className={({ isActive }) => `nav-item ${isActive || activeItem === label ? "active" : ""}`}
+            key={label} to={path} onClick={onClose} end={label === "Complaints"}>
+            <Icon name={icon} size={19} />
+            <span>{label}</span>
+            {label === "Complaints" && <span className="nav-shortcut">01</span>}
+          </NavLink>
         ))}
       </nav>
-      <button className="nav-item sidebar-logout" type="button" onClick={onLogout}>
-        <span className="nav-icon logout" aria-hidden="true" />
-        Logout
-      </button>
+      <div className="sidebar-bottom">
+        <div className="sidebar-support"><span className="support-indicator" /><span><strong>All systems operational</strong><small>Service desk online</small></span></div>
+        <button className="nav-item sidebar-logout" type="button" onClick={onLogout}>
+          <Icon name="logout" size={19} /><span>Sign out</span>
+        </button>
+      </div>
     </aside>
   );
 }

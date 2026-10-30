@@ -1,106 +1,94 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import Navbar from "../components/Navbar";
-import Sidebar from "../components/Sidebar";
-import { api, getCollection, getErrorMessage } from "../services/api";
+import AppShell from "../components/AppShell";
+import { ErrorState, LoadingSkeleton, PageHeader } from "../components/Feedback";
+import Icon from "../components/Icon";
+import NotificationList from "../components/NotificationList";
+import { useNotificationCount } from "../components/NotificationCountContext";
+import { useToast } from "../components/ToastContext";
+import { getCollection, getErrorMessage, getNotifications, markAllNotificationsRead, markNotificationRead } from "../services/api";
 
-const getNotificationId = (notification) => notification.notificationId || notification.id || "-";
-const getComplaintId = (notification) => notification.complaintId || notification.complaint?.id || notification.complaint?.complaintId || "-";
-const getMessage = (notification) => notification.message || notification.content || notification.text || "Notification update";
-const getType = (notification) => notification.type || notification.notificationType || "Update";
-const getUserId = (notification) => notification.userId || notification.user?.id || notification.username || "-";
-const isNotificationRead = (notification) => Boolean(notification.read ?? notification.isRead ?? ["READ", "Read"].includes(notification.readStatus));
-
-function Notifications({ username, onLogout }) {
-  const navigate = useNavigate();
+function Notifications({ username, user, onLogout }) {
+  const showToast = useToast();
+  const { unreadCount, refreshUnreadCount } = useNotificationCount();
   const [notifications, setNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [markingIds, setMarkingIds] = useState([]);
+  const [isMarkingAll, setIsMarkingAll] = useState(false);
   const [error, setError] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const loadNotifications = async () => {
+  useEffect(() => {
+    let active = true;
+    getNotifications()
+      .then((response) => { if (active) setNotifications(getCollection(response)); })
+      .catch((requestError) => { if (active) setError(getErrorMessage(requestError)); })
+      .finally(() => { if (active) setIsLoading(false); });
+    return () => { active = false; };
+  }, [refreshKey]);
+
+  const refresh = () => {
     setIsLoading(true);
     setError("");
+    setRefreshKey((value) => value + 1);
+  };
+
+  const markRead = async (notificationId) => {
+    setMarkingIds((current) => [...current, notificationId]);
+    setError("");
     try {
-      const response = await api.get("/notifications");
-      setNotifications(getCollection(response));
+      const { data } = await markNotificationRead(notificationId);
+      setNotifications((current) => current.map((notification) =>
+        (notification.notificationId || notification.id) === notificationId ? data : notification));
+      await refreshUnreadCount();
+      showToast("Notification marked as read.");
     } catch (requestError) {
-      setError(getErrorMessage(requestError));
+      const message = getErrorMessage(requestError);
+      setError(message);
+      showToast(message, "error");
     } finally {
-      setIsLoading(false);
+      setMarkingIds((current) => current.filter((id) => id !== notificationId));
     }
   };
 
-  useEffect(() => {
-    let isMounted = true;
-    api.get("/notifications")
-      .then((response) => {
-        if (isMounted) setNotifications(getCollection(response));
-      })
-      .catch((requestError) => {
-        if (isMounted) setError(getErrorMessage(requestError));
-      })
-      .finally(() => {
-        if (isMounted) setIsLoading(false);
-      });
+  const markAllRead = async () => {
+    setIsMarkingAll(true);
+    setError("");
+    try {
+      const { data } = await markAllNotificationsRead();
+      await refreshUnreadCount();
+      setIsLoading(true);
+      setRefreshKey((value) => value + 1);
+      showToast(`${data?.count || 0} notification${data?.count === 1 ? "" : "s"} marked as read.`);
+    } catch (requestError) {
+      const message = getErrorMessage(requestError);
+      setError(message);
+      showToast(message, "error");
+    } finally {
+      setIsMarkingAll(false);
+    }
+  };
 
-    return () => { isMounted = false; };
-  }, []);
-
-  return (
-    <div className="dashboard-shell">
-      <Navbar username={username} onLogout={onLogout} />
-      <div className="dashboard-body">
-        <Sidebar
-          activeItem="Notifications"
-          onNavigate={(item) => {
-            if (item === "Dashboard") navigate("/dashboard");
-            if (item === "Complaints") navigate("/complaints");
-            if (item === "Assignments") navigate("/assignments");
-            if (item === "Profile") navigate("/profile");
-          }}
-          onLogout={onLogout}
-        />
-        <main className="dashboard-main">
-          <div className="dashboard-heading">
-            <div>
-              <p className="eyebrow">SERVICE DESK / NOTIFICATIONS</p>
-              <h1>Notification center</h1>
-              <p className="page-description">Stay up to date with complaint activity and service desk changes.</p>
-            </div>
-            <button className="primary-button compact" type="button" onClick={loadNotifications} disabled={isLoading}>
-              {isLoading ? "Loading..." : "Refresh data"}
-            </button>
-          </div>
-
-          {error && <div className="error-banner">{error}</div>}
-          <section className="surface notifications-page-surface">
-            <div className="section-heading">
-              <div><p className="eyebrow">RECENT ACTIVITY</p><h2>All notifications</h2></div>
-              <span className="section-count">{notifications.length} total</span>
-            </div>
-            {isLoading ? <div className="state-panel"><span className="spinner" />Loading notifications...</div> : !notifications.length ? <div className="empty-state">You are all caught up. No notifications found.</div> : (
-              <div className="table-wrap">
-                <table>
-                  <thead><tr><th>Notification ID</th><th>Complaint ID</th><th>Message</th><th>Type</th><th>Read Status</th><th>User ID</th></tr></thead>
-                  <tbody>{notifications.map((notification, index) => {
-                    const read = isNotificationRead(notification);
-                    return <tr className={read ? "notification-row read" : "notification-row unread"} key={getNotificationId(notification) === "-" ? index : getNotificationId(notification)}>
-                      <td className="id-cell">#{getNotificationId(notification)}</td>
-                      <td className="id-cell">#{getComplaintId(notification)}</td>
-                      <td className="notification-message-cell">{getMessage(notification)}</td>
-                      <td>{getType(notification)}</td>
-                      <td><span className={`read-state ${read ? "read" : "unread"}`}>{read ? "READ" : "UNREAD"}</span></td>
-                      <td>{getUserId(notification)}</td>
-                    </tr>;
-                  })}</tbody>
-                </table>
-              </div>
-            )}
-          </section>
-        </main>
+  return <AppShell activeItem="Notifications" username={username} role={user?.role} onLogout={onLogout}>
+    <PageHeader eyebrow="SERVICE DESK / ACTIVITY" title="Notifications"
+      description="Stay current on complaint and assignment activity."
+      actions={<button className="button button-secondary" type="button" onClick={refresh} disabled={isLoading}>
+        <Icon name="refresh" size={17} />{isLoading ? "Refreshing" : "Refresh"}
+      </button>} />
+    {error && <ErrorState title="Unable to load notifications." detail={error} onRetry={refresh} />}
+    <section className="surface notifications-page-surface">
+      <div className="section-heading">
+        <div><p className="eyebrow">INBOX</p><h2>All notifications</h2></div>
+        <div className="notification-toolbar">
+          <span className="section-count"><strong>{unreadCount}</strong> unread · {notifications.length} total</span>
+          <button className="button button-primary" type="button" onClick={markAllRead}
+            disabled={isMarkingAll || unreadCount === 0}>{isMarkingAll ? "Saving..." : "Mark all read"}</button>
+        </div>
       </div>
-    </div>
-  );
+      {isLoading ? <LoadingSkeleton rows={5} /> : notifications.length
+        ? <NotificationList notifications={notifications} onMarkRead={markRead} markingIds={markingIds} limit={notifications.length} />
+        : <div className="empty-state-panel"><div className="empty-state-mark"><Icon name="notifications" size={25} /></div><h3>You're all caught up</h3><p>New complaint and assignment updates will appear here.</p></div>}
+    </section>
+  </AppShell>;
 }
 
 export default Notifications;

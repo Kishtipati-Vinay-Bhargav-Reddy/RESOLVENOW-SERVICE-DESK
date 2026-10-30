@@ -25,5 +25,7 @@ frontend/dist/
 
 # OS
 .DS_Store
-Thumbs.dbRESOLVENOW-SERVICE-DESK/
-/RESOLVENOW-SERVICE-DESK/
+Thumbs.db
+
+# Archives
+*.zip

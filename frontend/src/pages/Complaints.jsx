@@ -1,118 +1,167 @@
-import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import Navbar from "../components/Navbar";
-import Sidebar from "../components/Sidebar";
-import { api, getCollection, getErrorMessage } from "../services/api";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import AppShell from "../components/AppShell";
+import ComplaintList from "../components/ComplaintList";
+import { EmptyState, ErrorState, LoadingSkeleton, PageHeader } from "../components/Feedback";
+import Icon from "../components/Icon";
+import { useToast } from "../components/ToastContext";
+import { createComplaint, getCollection, getComplaints, getErrorMessage } from "../services/api";
 
-const initialForm = {
-  title: "",
-  description: "",
-  department: "IT",
-  username: "",
-};
+const departments = ["IT", "HR", "FINANCE", "OPERATIONS"];
+const priorities = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+const statusFilters = [["", "All status"], ["OPEN", "Open"], ["ASSIGNED", "Assigned"], ["IN_PROGRESS", "In progress"], ["RESOLVED", "Resolved"], ["CLOSED", "Closed"]];
+const defaultForm = { title: "", department: "IT", description: "", priority: "MEDIUM" };
+const idOf = (complaint) => complaint.id ?? complaint.complaintId;
+const statusOf = (complaint) => String(complaint.status || "OPEN").toUpperCase();
 
-const getStatus = (complaint) => complaint.status || complaint.complaintStatus || "Open";
-const getId = (complaint) => complaint.complaintId || complaint.id || "-";
-
-function Complaints({ username, onLogout }) {
-  const navigate = useNavigate();
-  const [form, setForm] = useState(() => ({ ...initialForm, username: username || localStorage.getItem("username") || "" }));
+function Complaints({ username, user, onLogout }) {
+  const showToast = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [complaints, setComplaints] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-
-  const loadComplaints = useCallback(async () => {
-    setIsLoading(true);
-    setError("");
-    try {
-      const response = await api.get("/complaints");
-      setComplaints(getCollection(response));
-    } catch (requestError) {
-      setError(getErrorMessage(requestError));
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [form, setForm] = useState(defaultForm);
+  const [formOpen, setFormOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
+  const query = searchParams.get("q") || "";
+  const statusFilter = searchParams.get("status") || "";
+  const departmentFilter = searchParams.get("department") || "";
+  const sort = searchParams.get("sort") || "updated";
 
   useEffect(() => {
-    let isMounted = true;
-    api.get("/complaints")
-      .then((response) => {
-        if (isMounted) setComplaints(getCollection(response));
-      })
-      .catch((requestError) => {
-        if (isMounted) setError(getErrorMessage(requestError));
-      })
+    let active = true;
+    getComplaints()
+      .then((response) => { if (active) setComplaints(getCollection(response)); })
+      .catch((requestError) => { if (active) setError(getErrorMessage(requestError)); })
       .finally(() => {
-        if (isMounted) setIsLoading(false);
+        if (active) {
+          setIsLoading(false);
+          setRefreshing(false);
+        }
       });
+    return () => { active = false; };
+  }, [refreshKey]);
 
-    return () => { isMounted = false; };
-  }, []);
-
-  const handleChange = (event) => {
-    const { name, value } = event.target;
-    setForm((current) => ({ ...current, [name]: value }));
-    setSuccess("");
+  const setFilter = (name, value) => {
+    const params = new URLSearchParams(searchParams);
+    if (value) params.set(name, value);
+    else params.delete(name);
+    setSearchParams(params, { replace: true });
   };
 
-  const handleSubmit = async (event) => {
+  const refresh = () => {
+    setIsLoading(true);
+    setRefreshing(true);
+    setError("");
+    setRefreshKey((value) => value + 1);
+  };
+
+  const updateForm = (event) => {
+    setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
+    setFormError("");
+  };
+
+  const submitComplaint = async (event) => {
     event.preventDefault();
     setIsSubmitting(true);
-    setError("");
-    setSuccess("");
-
+    setFormError("");
     try {
-      await api.post("/complaints", form);
-      setForm({ ...initialForm, username: username || localStorage.getItem("username") || "" });
-      setSuccess("Complaint created successfully.");
-      await loadComplaints();
+      await createComplaint({
+        ...form,
+        title: form.title.trim(),
+        description: form.description.trim(),
+        priority: form.priority,
+      });
+      setForm(defaultForm);
+      setFormOpen(false);
+      showToast("Complaint created and submitted.");
+      window.dispatchEvent(new Event("notifications:changed"));
+      refresh();
     } catch (requestError) {
-      setError(getErrorMessage(requestError));
+      setFormError(getErrorMessage(requestError));
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  return (
-    <div className="dashboard-shell">
-      <Navbar username={username} onLogout={onLogout} />
-      <div className="dashboard-body">
-        <Sidebar activeItem="Complaints" onNavigate={(item) => item === "Dashboard" ? navigate("/dashboard") : item === "Assignments" ? navigate("/assignments") : item === "Notifications" ? navigate("/notifications") : item === "Profile" ? navigate("/profile") : undefined} onLogout={onLogout} />
-        <main className="dashboard-main complaints-page">
-          <div className="dashboard-heading">
-            <div>
-              <p className="eyebrow">SERVICE DESK / COMPLAINTS</p>
-              <h1>Create a complaint</h1>
-              <p className="page-description">Log a customer issue and send it to the right department.</p>
-            </div>
-          </div>
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredComplaints = complaints.filter((complaint) => {
+    const searchable = [idOf(complaint), complaint.title, complaint.description, complaint.department, complaint.priority]
+      .filter(Boolean).join(" ").toLowerCase();
+    return (!normalizedQuery || searchable.includes(normalizedQuery))
+      && (!statusFilter || statusOf(complaint) === statusFilter)
+      && (!departmentFilter || complaint.department === departmentFilter);
+  });
+  filteredComplaints.sort((left, right) => {
+    if (sort === "oldest") return new Date(left.createdAt) - new Date(right.createdAt);
+    if (sort === "newest") return new Date(right.createdAt) - new Date(left.createdAt);
+    if (sort === "status") return statusOf(left).localeCompare(statusOf(right));
+    return new Date(right.updatedAt || right.createdAt) - new Date(left.updatedAt || left.createdAt);
+  });
 
-          <section className="surface complaint-form-surface">
-            <div className="section-heading">
-              <div><p className="eyebrow">NEW REQUEST</p><h2>Complaint details</h2></div>
-            </div>
-            <form className="complaint-form" onSubmit={handleSubmit}>
-              <label>Title<input name="title" value={form.title} onChange={handleChange} placeholder="Briefly describe the issue" required /></label>
-              <label>Department<select name="department" value={form.department} onChange={handleChange} required><option>IT</option><option>HR</option><option>Finance</option><option>Operations</option></select></label>
-              <label className="full-width">Description<textarea name="description" value={form.description} onChange={handleChange} placeholder="Add the relevant details, impact, and context" rows="5" required /></label>
-              <label>Username<input name="username" value={form.username} onChange={handleChange} placeholder="Customer username" required /></label>
-              <div className="form-actions"><button className="primary-button" type="submit" disabled={isSubmitting}>{isSubmitting ? "Creating..." : "Create complaint"}</button></div>
-            </form>
-            {success && <p className="inline-success">{success}</p>}
-            {error && <p className="inline-error">{error}</p>}
-          </section>
+  const clearFilters = () => setSearchParams(new URLSearchParams(), { replace: true });
 
-          <section className="surface complaints-list-surface">
-            <div className="section-heading"><div><p className="eyebrow">ISSUE REGISTER</p><h2>Existing complaints</h2></div><span className="section-count">{complaints.length} total</span></div>
-            {isLoading ? <div className="state-panel"><span className="spinner" />Loading complaints...</div> : !complaints.length ? <div className="empty-state">No complaints found. Create the first one above.</div> : <div className="complaints-cards">{complaints.map((complaint, index) => <article className="complaint-record" key={getId(complaint) === "-" ? index : getId(complaint)}><div className="record-heading"><span className="id-cell">#{getId(complaint)}</span><span className={`status status-${String(getStatus(complaint)).toLowerCase()}`}>{getStatus(complaint)}</span></div><h3>{complaint.title || complaint.subject || "Untitled complaint"}</h3><p>{complaint.description || "No description provided."}</p><div className="record-meta"><span><strong>Department</strong>{complaint.department || complaint.departmentName || "-"}</span><span><strong>Username</strong>{complaint.username || complaint.user?.username || complaint.userName || "-"}</span></div></article>)}</div>}
-          </section>
-        </main>
+  return <AppShell activeItem="Complaints" username={username} role={user?.role} onLogout={onLogout}>
+    <PageHeader eyebrow="SERVICE DESK / WORK QUEUE" title="Complaints"
+      description="Manage reported issues and track each one through resolution."
+      actions={<>
+        <button className="button button-secondary" type="button" onClick={refresh} disabled={refreshing}><Icon name="refresh" size={17} />{refreshing ? "Refreshing" : "Refresh"}</button>
+        <button className="button button-primary" type="button" onClick={() => setFormOpen((open) => !open)} aria-expanded={formOpen}>
+          <Icon name={formOpen ? "close" : "plus"} size={18} />{formOpen ? "Close form" : "New complaint"}
+        </button>
+      </>} />
+
+    {error && <ErrorState title="Unable to load complaints." detail={error} onRetry={refresh} />}
+
+    {formOpen && <section className="surface complaint-composer" aria-labelledby="new-complaint-title">
+      <div className="section-heading"><div><p className="eyebrow">NEW REQUEST</p><h2 id="new-complaint-title">Complaint details</h2></div></div>
+      <form className="complaint-form" onSubmit={submitComplaint}>
+        <label>Title<input name="title" value={form.title} onChange={updateForm} placeholder="Briefly describe the issue" maxLength={120} required /></label>
+        <label>Department<select name="department" value={form.department} onChange={updateForm} required>
+          {departments.map((department) => <option key={department} value={department}>{department[0] + department.slice(1).toLowerCase()}</option>)}
+        </select></label>
+        <label>Priority<select name="priority" value={form.priority} onChange={updateForm}>
+          {priorities.map((priority) => <option key={priority} value={priority}>{priority[0] + priority.slice(1).toLowerCase()}</option>)}
+        </select></label>
+        <label className="field-wide">Description<textarea name="description" value={form.description} onChange={updateForm}
+          placeholder="Include the impact, timing, and relevant context" maxLength={2000} rows={5} required /></label>
+        {formError && <p className="field-wide form-error" role="alert">{formError}</p>}
+        <div className="form-footer field-wide"><span>Your account identity and SLA target are attached automatically.</span>
+          <button className="button button-primary" type="submit" disabled={isSubmitting}>{isSubmitting ? "Submitting..." : "Submit complaint"}</button>
+        </div>
+      </form>
+    </section>}
+
+    <section className="surface complaint-register" aria-labelledby="complaint-register-title">
+      <div className="section-heading register-heading">
+        <div><p className="eyebrow">ISSUE REGISTER</p><h2 id="complaint-register-title">All complaints</h2></div>
+        <span className="section-count">{filteredComplaints.length} of {complaints.length}</span>
       </div>
-    </div>
-  );
+      <div className="filter-toolbar">
+        <label className="search-control"><Icon name="search" size={18} /><input aria-label="Search complaints" placeholder="Search ID, title, details" value={query}
+          onChange={(event) => setFilter("q", event.target.value)} /></label>
+        <label className="filter-control"><span className="visually-hidden">Filter by status</span><select value={statusFilter} onChange={(event) => setFilter("status", event.target.value)}>
+          {statusFilters.map(([value, label]) => <option key={label} value={value}>{label}</option>)}
+        </select></label>
+        <label className="filter-control"><span className="visually-hidden">Filter by department</span><select value={departmentFilter} onChange={(event) => setFilter("department", event.target.value)}>
+          <option value="">All departments</option>{departments.map((department) => <option key={department} value={department}>{department[0] + department.slice(1).toLowerCase()}</option>)}
+        </select></label>
+        <label className="filter-control"><span className="visually-hidden">Sort complaints</span><select value={sort} onChange={(event) => setFilter("sort", event.target.value)}>
+          <option value="updated">Recently updated</option><option value="newest">Newest</option><option value="oldest">Oldest</option><option value="status">Status</option>
+        </select></label>
+      </div>
+
+      {isLoading ? <LoadingSkeleton rows={5} /> : filteredComplaints.length
+        ? <ComplaintList complaints={filteredComplaints} />
+        : <EmptyState title={complaints.length ? "No matching complaints" : "No complaints yet"}
+          description={complaints.length ? "Try adjusting the search or filters." : "Submit a complaint to start tracking its progress."}
+          action={complaints.length ? <button type="button" className="button button-secondary button-small" onClick={clearFilters}>Clear filters</button>
+            : <button type="button" className="button button-primary button-small" onClick={() => setFormOpen(true)}>Create complaint</button>} />}
+    </section>
+  </AppShell>;
 }
 
 export default Complaints;
